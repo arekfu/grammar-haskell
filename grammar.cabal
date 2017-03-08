@@ -1,0 +1,50 @@
+name:                grammar
+version:             0.1.0.0
+synopsis:            A package to learn about context-free and regular grammars.
+description:         See README.md.
+homepage:            https://github.com/arekfu/grammar#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Davide Mancusi
+maintainer:          arekfu@gmail.com
+copyright:           2017 Davide Mancusi
+category:            Formal Languages
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Grammar
+                     , Grammar.Random
+                     , Grammar.ParseTree
+  build-depends:       base >= 4.7 && < 5
+                     , containers
+                     , random
+                     , mtl
+  default-language:    Haskell2010
+
+executable grammar-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , grammar
+                     , random
+  default-language:    Haskell2010
+
+test-suite grammar-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  other-modules:       GrammarTest
+  build-depends:       base
+                     , grammar
+                     , containers
+                     , QuickCheck
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/arekfu/grammar
