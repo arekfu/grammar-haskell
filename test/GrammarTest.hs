@@ -21,11 +21,11 @@ newtype ASymbol = AS { getASymbol :: Symbol ASCIIChar } deriving (Show, Eq)
 instance Arbitrary ASymbol where
     arbitrary = AS <$> (S <$> arbitrary)
 
-newtype ASentention = ASentention (Sentention ASCIIChar) deriving (Show, Eq)
-instance Arbitrary ASentention where
+newtype ASentential = ASentential (Sentential ASCIIChar) deriving (Show, Eq)
+instance Arbitrary ASentential where
     arbitrary = do asyms <- listOf arbitrary
                    let syms = map getASymbol asyms
-                   return $ ASentention $ Sentention syms
+                   return $ ASentential $ Sentential syms
 
 newtype ACSG = ACSG (CSG ASCIIChar) deriving (Show, Eq)
 instance Arbitrary ACSG where

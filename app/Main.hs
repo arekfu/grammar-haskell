@@ -14,6 +14,6 @@ exampleGrammar = productionsToGrammar exampleKeyValue
 main :: IO ()
 main = do print exampleGrammar
           let expander = randomSentExpand exampleGrammar
-          let expansion = return (Sentention [S 'E']) >>= expander >>= expander >>= expander >>= expander >>= expander
+          let expansion = return (Sentential [S 'E']) >>= expander >>= expander >>= expander >>= expander >>= expander
           let string = evalGrammar expansion 121333
           print string

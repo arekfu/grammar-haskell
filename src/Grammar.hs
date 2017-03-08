@@ -1,6 +1,6 @@
 module Grammar
 ( Symbol(..)
-, Sentention(..)
+, Sentential(..)
 , CSG(..)
 , apply
 , pick
@@ -22,37 +22,37 @@ instance Show a => Show (Symbol a) where
 instance Functor Symbol where
     fmap f (S sym) = S $ f sym
 
-newtype Sentention a = Sentention { getSyms :: [Symbol a] } deriving (Eq, Ord)
+newtype Sentential a = Sentential { getSyms :: [Symbol a] } deriving (Eq, Ord)
 
-instance Show a => Show (Sentention a) where
-    show (Sentention ls) = concatMap show ls
-instance Functor Sentention where
-    fmap f (Sentention sent) = Sentention $ map (fmap f) sent
+instance Show a => Show (Sentential a) where
+    show (Sentential ls) = concatMap show ls
+instance Functor Sentential where
+    fmap f (Sentential sent) = Sentential $ map (fmap f) sent
 
-concatSent :: [Sentention a] -> Sentention a
-concatSent = Sentention . concatMap getSyms
+concatSent :: [Sentential a] -> Sentential a
+concatSent = Sentential . concatMap getSyms
 
-newtype CSG a = CSG (M.Map (Symbol a) [Sentention a]) deriving (Eq, Ord)
+newtype CSG a = CSG (M.Map (Symbol a) [Sentential a]) deriving (Eq, Ord)
 
-showProduction :: Show a => Symbol a -> [Sentention a] -> String
+showProduction :: Show a => Symbol a -> [Sentential a] -> String
 showProduction sym ls = let header = show sym
                          in concatMap (\l -> header ++ " -> " ++ show l ++ "\n") ls
 
 instance Show a => Show (CSG a) where
     show (CSG prods) = concat $ M.mapWithKey showProduction prods
 
-keyValueToAssocList :: Ord a => (a, [[a]]) -> (Symbol a, [Sentention a])
-keyValueToAssocList (k, v) = (S k, map (Sentention . map S) v)
+keyValueToAssocList :: Ord a => (a, [[a]]) -> (Symbol a, [Sentential a])
+keyValueToAssocList (k, v) = (S k, map (Sentential . map S) v)
 
 productionsToGrammar :: Ord a => [(a, [[a]])] -> CSG a
 productionsToGrammar kvs = let assocList = map keyValueToAssocList kvs
                             in CSG $ M.fromList assocList
 
-apply :: Ord a => CSG a -> Symbol a -> [Sentention a]
+apply :: Ord a => CSG a -> Symbol a -> [Sentential a]
 apply (CSG p) nt = let inMap = M.lookup nt p
                   in concat $ maybeToList inMap
 
-pick :: Ord a => Int -> CSG a -> Symbol a -> Sentention a
+pick :: Ord a => Int -> CSG a -> Symbol a -> Sentential a
 pick n ps sym = apply ps sym !! n
 
 nonterminals :: Ord a => CSG a -> S.Set (Symbol a)

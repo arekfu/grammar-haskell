@@ -9,7 +9,7 @@ module Grammar.Random
 , sampleExp
 , getGen
 , pickRandom
-, pickRandomSentention
+, pickRandomSentential
 , randomSymExpand
 , randomSentExpand
 , evalGrammar
@@ -67,19 +67,19 @@ pickRandom set = let l = toList set
                   in do ran <- uniformInt 0 (n-1)
                         return $ l !! ran
 
-pickRandomSentention :: Ord a => CSG a -> Symbol a -> MC (Sentention a)
-pickRandomSentention ps sym = let sententions = apply ps sym
+pickRandomSentential :: Ord a => CSG a -> Symbol a -> MC (Sentential a)
+pickRandomSentential ps sym = let sententions = apply ps sym
                                in pickRandom sententions
 
-randomSymExpand :: Ord a => CSG a -> Symbol a -> MC (Sentention a)
+randomSymExpand :: Ord a => CSG a -> Symbol a -> MC (Sentential a)
 randomSymExpand grammar@(CSG prods) sym =
     if sym `M.member` prods
-    then do sent <- pickRandomSentention grammar sym
+    then do sent <- pickRandomSentential grammar sym
             return sent
-    else return $ Sentention [sym]
+    else return $ Sentential [sym]
 
-randomSentExpand :: Ord a => CSG a -> Sentention a -> MC (Sentention a)
-randomSentExpand g (Sentention syms) = do sents <- sequence $ map (randomSymExpand g) syms
+randomSentExpand :: Ord a => CSG a -> Sentential a -> MC (Sentential a)
+randomSentExpand g (Sentential syms) = do sents <- sequence $ map (randomSymExpand g) syms
                                           return $ concatSent sents
 
 evalGrammar :: MC a -> Int -> a
