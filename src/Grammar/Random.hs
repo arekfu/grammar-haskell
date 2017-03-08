@@ -12,6 +12,7 @@ module Grammar.Random
 , pickRandomSentential
 , randomSymExpand
 , randomSentExpand
+, randomSentDerive
 , evalGrammar
 ) where
 
@@ -81,6 +82,12 @@ randomSymExpand grammar@(CSG prods) sym =
 randomSentExpand :: Ord a => CSG a -> Sentential a -> MC (Sentential a)
 randomSentExpand g (Sentential syms) = do sents <- sequence $ map (randomSymExpand g) syms
                                           return $ concatSent sents
+
+randomSentDerive :: (Ord a, Show a) => CSG a -> Sentential a -> MC (Sentential a)
+randomSentDerive grammar@(CSG prods) sent =
+    do expanded <- randomSentExpand grammar sent
+       let isExpanded = all (\ sym -> sym `M.notMember` prods) $ getSyms expanded
+       if isExpanded then return expanded else randomSentDerive grammar expanded
 
 evalGrammar :: MC a -> Int -> a
 evalGrammar obj seed = let initialGen = mkStdGen seed
