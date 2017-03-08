@@ -9,6 +9,7 @@ module Grammar.Random
 , sampleExp
 , getGen
 , pickRandom
+, pickRandomSentention
 , randomSymExpand
 , randomSentExpand
 , evalGrammar
@@ -18,6 +19,7 @@ module Grammar.Random
 import System.Random
 import Control.Monad.State
 import qualified Data.Map as M
+import Data.Foldable (Foldable, length, toList)
 
 -- local imports
 import Grammar
@@ -59,22 +61,20 @@ sampleExp :: (Random a, Floating a, MonadState StdGen m)
 sampleExp lambda = do xi <- uniform
                       return $ (-lambda) * log xi
 
-pickRandom :: Ord a => CSG a -> Symbol a -> MC (Sentention a)
-pickRandom ps sym = let sententions = apply ps sym
-                        n = length sententions
-                     in do ran <- uniformInt 0 n
-                           return $ sententions !! ran
+pickRandom :: Foldable t => t a -> MC a
+pickRandom set = let l = toList set
+                     n = length l
+                  in do ran <- uniformInt 0 (n-1)
+                        return $ l !! ran
 
---randomSymDerive :: Ord a => CSG a -> Symbol a -> MC (ParseTree a)
---randomSymDerive (CSG prods) start = 
---
---randomSentDerive :: Ord a => CSG a -> Sentention a -> MC (ParseTree a)
---randomSentDerive grammar start = undefined
+pickRandomSentention :: Ord a => CSG a -> Symbol a -> MC (Sentention a)
+pickRandomSentention ps sym = let sententions = apply ps sym
+                               in pickRandom sententions
 
 randomSymExpand :: Ord a => CSG a -> Symbol a -> MC (Sentention a)
 randomSymExpand grammar@(CSG prods) sym =
     if sym `M.member` prods
-    then do sent <- pickRandom grammar sym
+    then do sent <- pickRandomSentention grammar sym
             return sent
     else return $ Sentention [sym]
 
