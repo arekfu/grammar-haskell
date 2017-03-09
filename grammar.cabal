@@ -23,7 +23,6 @@ library
                      , containers
                      , random
                      , mtl
-                     , QuickCheck
   default-language:    Haskell2010
 
 executable grammar-exe
