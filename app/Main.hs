@@ -1,19 +1,20 @@
 module Main where
 
 import Grammar
---import Grammar.Random
 
 exampleKeyValue :: [(Char, [String])]
-exampleKeyValue = [ ('E', ["E+E", "E*E", "(E)", "I"])
-                  , ('I', ["a", "b", "Ia", "Ib", "I0", "I1"])
-                  ]
+exampleKeyValue = let initialChars = map (:[]) ['a'..'c']
+                      chars = ['a'..'c'] ++ ['0'..'3']
+                      expansions = map (\c -> ['I', c]) chars
+                   in [ ('E', ["E+E", "E*E", "(E)", "I"])
+                      , ('I', initialChars ++ expansions)
+                      ]
 
 exampleGrammar :: CharCFG
 exampleGrammar = productionsToCharCFG exampleKeyValue
 
 main :: IO ()
 main = do print exampleGrammar
---          let expander = randomSentExpand exampleGrammar
---          let expansion = return (Sentential [S 'E']) >>= expander >>= expander >>= expander >>= expander >>= expander
---          let string = evalGrammar expansion 121333
---          print string
+          let expansion = randomSentDeriveScan exampleGrammar "E"
+          let strings = take 20 $ evalGrammar expansion 121333
+          mapM_ putStrLn strings
