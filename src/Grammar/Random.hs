@@ -9,7 +9,7 @@ module Grammar.Random
 , sampleExp
 , getGen
 , pickRandom
-, pickRandomSentential
+, pickRandomSentence
 , randomSymExpand
 , randomSentExpand
 , randomSentDerive
@@ -19,11 +19,10 @@ module Grammar.Random
 -- system imports
 import System.Random
 import Control.Monad.State
-import qualified Data.Map as M
 import Data.Foldable (Foldable, length, toList)
 
 -- local imports
-import Grammar
+import Grammar.Internal
 --import Grammar.ParseTree
 
 type Seed = Int
@@ -68,25 +67,25 @@ pickRandom set = let l = toList set
                   in do ran <- uniformInt 0 (n-1)
                         return $ l !! ran
 
-pickRandomSentential :: Ord a => CSG a -> Symbol a -> MC (Sentential a)
-pickRandomSentential ps sym = let sententions = apply ps sym
-                               in pickRandom sententions
+pickRandomSentence :: (Grammar g, Ord (Repr g)) => g -> Repr g -> MC [Repr g]
+pickRandomSentence gr sym = let sentences = productions gr sym
+                               in pickRandom sentences
 
-randomSymExpand :: Ord a => CSG a -> Symbol a -> MC (Sentential a)
-randomSymExpand grammar@(CSG prods) sym =
-    if sym `M.member` prods
-    then do sent <- pickRandomSentential grammar sym
+randomSymExpand :: (Grammar g, Ord (Repr g)) => g -> Repr g -> MC [Repr g]
+randomSymExpand grammar sym =
+    if sym `isInGrammar` grammar
+    then do sent <- pickRandomSentence grammar sym
             return sent
-    else return $ Sentential [sym]
+    else return [sym]
 
-randomSentExpand :: Ord a => CSG a -> Sentential a -> MC (Sentential a)
-randomSentExpand g (Sentential syms) = do sents <- sequence $ map (randomSymExpand g) syms
-                                          return $ concatSent sents
+randomSentExpand :: (Grammar g, Ord (Repr g)) => g -> [Repr g] -> MC [Repr g]
+randomSentExpand g syms = do sents <- sequence $ map (randomSymExpand g) syms
+                             return $ concat sents
 
-randomSentDerive :: (Ord a, Show a) => CSG a -> Sentential a -> MC (Sentential a)
-randomSentDerive grammar@(CSG prods) sent =
+randomSentDerive :: (Grammar g, Ord (Repr g), Show (Repr g)) => g -> [Repr g] -> MC [Repr g]
+randomSentDerive grammar sent =
     do expanded <- randomSentExpand grammar sent
-       let isExpanded = all (\ sym -> sym `M.notMember` prods) $ getSyms expanded
+       let isExpanded = all (`isNotInGrammar` grammar) expanded
        if isExpanded then return expanded else randomSentDerive grammar expanded
 
 evalGrammar :: MC a -> Int -> a
