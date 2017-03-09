@@ -55,10 +55,6 @@ showGrammar grammar = let symbols = S.toList $ getSymbols grammar
                        in concatMap (\(s, p) -> showProductions grammar s p) $ zip symbols prods
 
 
----- | Data.Map helper function. Inverts keys and values.
---invertMap :: Ord v => M.Map k v -> M.Map v k
---invertMap = M.foldrWithKey' (\ key val inverse -> M.insert val key inverse) M.empty
-
 pick :: Grammar g => Int -> g -> Repr g -> [Repr g]
 pick n grammar sym = productions grammar sym !! n
 
