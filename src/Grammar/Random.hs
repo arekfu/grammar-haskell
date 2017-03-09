@@ -1,20 +1,35 @@
+{-|
+Module      : Grammar.Random
+Description : Functions to randomly expand symbols according to a grammar.
+Copyright   : (c) Davide Mancusi, 2017
+License     : BSD
+Maintainer  : arekfu@gmail.com
+Stability   : experimental
+Portability : POSIX
+
+This module contains the relevant tools to sample random sentences from a
+context-free grammar. All computations take place in the 'MC' monad, which is
+simply a practical way to thread the pseudo-random-number generator (PRNG)
+state. Be careful: the expansion is currently totally unbiased -- it will
+expand a given nonterminal by assuming that all of the production rules have
+equal probability. Depending on the grammar, this may lead the size of the
+generated sentence to grow without bound, or to become very large.
+-}
+
 {-# LANGUAGE FlexibleContexts #-}
 
 module Grammar.Random
-( MC
+(
+-- * The 'MC' monad
+  MC
 , Seed
-, uniformInt
-, uniform
-, uniforms
-, sampleExp
-, getGen
-, pickRandom
+, evalGrammar
+-- * Randomly expanding symbols and sentences
 , randomSymExpand
 , randomSentExpand
 , randomSentDerive
 , randomSentDeriveN
 , randomSentDeriveScan
-, evalGrammar
 ) where
 
 -- system imports
@@ -24,17 +39,31 @@ import Data.Foldable (Foldable, length, toList)
 
 -- local imports
 import Grammar.Internal
---import Grammar.ParseTree
 
+-- | Just a type alias for the PRNG seed.
 type Seed = Int
 
+-- | The 'MC' type is just an alias for the 'State' 'StdGen' monad. Yes, 'MC' stands for Monte Carlo.
 type MC = State StdGen
+
+{- | How do I escape from the 'MC' monad? Just call evalGrammar and supply a
+   starting seed for the pseudo-random number generator.
+-}
+evalGrammar :: MC a -- ^ the computation to perform
+            -> Seed -- ^ the starting seed
+            -> a    -- ^ the computation result
+evalGrammar obj seed = let initialGen = mkStdGen seed
+                        in evalState obj initialGen
+
+-----------------------------------------------
+--  some machinery to sample random numbers  --
+-----------------------------------------------
 
 getGen :: MonadState StdGen m => m StdGen
 getGen = get
 
-uniform :: (Random a, Fractional a, MonadState StdGen m) => m a
-uniform = do
+_uniform :: (Random a, Fractional a, MonadState StdGen m) => m a
+_uniform = do
     gen <- getGen
     let (xi, gen') = randomR (0.0, 1.0) gen
     put gen'
@@ -47,55 +76,78 @@ uniformInt minVal maxVal = do
     put gen'
     return xi
 
-uniforms :: (Random a, Fractional a, MonadState StdGen m)
+_uniforms :: (Random a, Fractional a, MonadState StdGen m)
          => Int
          -> m [a]
-uniforms n = replicateM n uniform
+_uniforms n = replicateM n _uniform
 
 -- | Sample from an exponential distribution of the form
 -- @
 -- f(x) = exp(-&#x3BB; x)/&#x3BB;
 -- @
-sampleExp :: (Random a, Floating a, MonadState StdGen m)
+_sampleExp :: (Random a, Floating a, MonadState StdGen m)
           => a  -- ^ The distribution
           -> m a
-sampleExp lambda = do xi <- uniform
-                      return $ (-lambda) * log xi
+_sampleExp lambda = do xi <- _uniform
+                       return $ (-lambda) * log xi
 
+-- | Pick a random element from a Foldable container.
 pickRandom :: Foldable t => t a -> MC a
 pickRandom set = let l = toList set
                      n = length l
                   in do ran <- uniformInt 0 (n-1)
                         return $ l !! ran
 
-randomSymExpand :: (Grammar g, Ord (Repr g)) => g -> Repr g -> MC [Repr g]
+-- | Randomly expand a symbol using one of its production rules.
+randomSymExpand :: (Grammar g, Ord (Repr g))
+                => g            -- ^ the grammar
+                -> Repr g       -- ^ the symbol to expand
+                -> MC [Repr g]  -- ^ the resulting sentence
 randomSymExpand gr sym = case productions gr sym of
                                 [] -> return [sym]
                                 sentences  -> pickRandom sentences
 
-randomSentExpand :: (Grammar g, Ord (Repr g)) => g -> [Repr g] -> MC [Repr g]
+-- | Expand a sentence (a sequence of symbols) using randomly selected
+--   production rules for each nonterminal.
+randomSentExpand :: (Grammar g, Ord (Repr g))
+                 => g           -- ^ the grammar
+                 -> [Repr g]    -- ^ the sentence to expand
+                 -> MC [Repr g] -- ^ the resulting sentence
 randomSentExpand g syms = do sents <- sequence $ map (randomSymExpand g) syms
                              return $ concat sents
 
-randomSentDerive :: (Grammar g, Ord (Repr g)) => g -> [Repr g] -> MC [Repr g]
+-- | Recursively and randomly expand a sentence until it consists solely of
+--   terminals. WARNING: may produce infinite lists!
+randomSentDerive :: (Grammar g, Ord (Repr g))
+                 => g           -- ^ the grammar
+                 -> [Repr g]    -- ^ the sentence to expand
+                 -> MC [Repr g] -- ^ a fully expanded sequence of terminals
 randomSentDerive grammar sent =
     do expanded <- randomSentExpand grammar sent
        if sent == expanded
        then return expanded
        else randomSentDerive grammar expanded
 
-randomSentDeriveN :: (Grammar g, Ord (Repr g)) => Int -> g -> [Repr g] -> MC [Repr g]
+-- | Recursively and randomly expand a sentence until it consists solely of
+--   terminals or until @n@ expansion steps have been performed, whichever
+--   comes first.
+randomSentDeriveN :: (Grammar g, Ord (Repr g))
+                  => Int            -- ^ the maximum number of expansions
+                  -> g              -- ^ the grammar
+                  -> [Repr g]       -- ^ the starting sentence
+                  -> MC [Repr g]    -- ^ the resulting expansion
 randomSentDeriveN 0 _ sent = return sent
 randomSentDeriveN n grammar sent = do expanded <- randomSentDerive grammar sent
                                       randomSentDeriveN (n-1) grammar expanded
 
-randomSentDeriveScan :: (Grammar g, Ord (Repr g)) => g -> [Repr g] -> MC [[Repr g]]
+-- | Recursively and randomly expand a sentence, and return all the
+--   intermediate expansion results. WARNING: may produce infinite lists!
+randomSentDeriveScan :: (Grammar g, Ord (Repr g))
+                     => g               -- ^ the grammar
+                     -> [Repr g]        -- ^ the starting sentence
+                     -> MC [[Repr g]]   -- ^ the list of all intermediate expansions
 randomSentDeriveScan grammar sent =
     do expanded <- randomSentExpand grammar sent
        if sent == expanded
        then return [expanded]
        else liftM (expanded:) (randomSentDeriveScan grammar expanded)
-
-evalGrammar :: MC a -> Int -> a
-evalGrammar obj seed = let initialGen = mkStdGen seed
-                        in evalState obj initialGen

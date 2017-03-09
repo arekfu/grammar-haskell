@@ -6,6 +6,11 @@ Building
 
     $ stack build
 
+Documentation
+--------
+
+    $ stack haddock
+
 Testing
 -------
 
