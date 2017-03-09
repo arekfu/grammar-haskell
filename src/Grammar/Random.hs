@@ -9,10 +9,11 @@ module Grammar.Random
 , sampleExp
 , getGen
 , pickRandom
-, pickRandomSentence
 , randomSymExpand
 , randomSentExpand
 , randomSentDerive
+, randomSentDeriveN
+, randomSentDeriveScan
 , evalGrammar
 ) where
 
@@ -67,26 +68,33 @@ pickRandom set = let l = toList set
                   in do ran <- uniformInt 0 (n-1)
                         return $ l !! ran
 
-pickRandomSentence :: (Grammar g, Ord (Repr g)) => g -> Repr g -> MC [Repr g]
-pickRandomSentence gr sym = let sentences = productions gr sym
-                               in pickRandom sentences
-
 randomSymExpand :: (Grammar g, Ord (Repr g)) => g -> Repr g -> MC [Repr g]
-randomSymExpand grammar sym =
-    if sym `isInGrammar` grammar
-    then do sent <- pickRandomSentence grammar sym
-            return sent
-    else return [sym]
+randomSymExpand gr sym = case productions gr sym of
+                                [] -> return [sym]
+                                sentences  -> pickRandom sentences
 
 randomSentExpand :: (Grammar g, Ord (Repr g)) => g -> [Repr g] -> MC [Repr g]
 randomSentExpand g syms = do sents <- sequence $ map (randomSymExpand g) syms
                              return $ concat sents
 
-randomSentDerive :: (Grammar g, Ord (Repr g), Show (Repr g)) => g -> [Repr g] -> MC [Repr g]
+randomSentDerive :: (Grammar g, Ord (Repr g)) => g -> [Repr g] -> MC [Repr g]
 randomSentDerive grammar sent =
     do expanded <- randomSentExpand grammar sent
-       let isExpanded = all (`isNotInGrammar` grammar) expanded
-       if isExpanded then return expanded else randomSentDerive grammar expanded
+       if sent == expanded
+       then return expanded
+       else randomSentDerive grammar expanded
+
+randomSentDeriveN :: (Grammar g, Ord (Repr g)) => Int -> g -> [Repr g] -> MC [Repr g]
+randomSentDeriveN 0 _ sent = return sent
+randomSentDeriveN n grammar sent = do expanded <- randomSentDerive grammar sent
+                                      randomSentDeriveN (n-1) grammar expanded
+
+randomSentDeriveScan :: (Grammar g, Ord (Repr g)) => g -> [Repr g] -> MC [[Repr g]]
+randomSentDeriveScan grammar sent =
+    do expanded <- randomSentExpand grammar sent
+       if sent == expanded
+       then return [expanded]
+       else liftM (expanded:) (randomSentDeriveScan grammar expanded)
 
 evalGrammar :: MC a -> Int -> a
 evalGrammar obj seed = let initialGen = mkStdGen seed
