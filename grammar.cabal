@@ -1,6 +1,6 @@
 name:                grammar
 version:             0.1.0.0
-synopsis:            A package to learn about context-free and regular grammars.
+synopsis:            Context-free grammars andrandom sentence generation.
 description:         See README.md.
 homepage:            https://github.com/arekfu/grammar#readme
 license:             BSD3

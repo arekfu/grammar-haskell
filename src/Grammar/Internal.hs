@@ -1,22 +1,35 @@
+{-|
+Module      : Grammar.Internal
+Description : Datatypes and main functions for CFG grammars.
+Copyright   : (c) Davide Mancusi, 2017
+License     : BSD
+Maintainer  : arekfu@gmail.com
+Stability   : experimental
+Portability : POSIX
+
+This module contains the most important datatypes of the @Grammar@ package and
+the functions that operate on them.
+-}
+
 {-# LANGUAGE TypeFamilies, FlexibleContexts #-}
 
 module Grammar.Internal
-( Grammar(..)
+(
+-- * The 'Grammar' type class
+  Grammar(..)
+, pick
+-- ** Pretty-printing parts of a grammar
+-- $examplegrammar
 , showSentence
 , showProductions
 , showGrammar
-, pick
+-- * Context-free grammars over alphabets of integers
+, IntCFG
 , productionsToIntCFG
-, CFG(..)
+-- * Context free grammars over alphabets of arbitrary types
+, CFG
 , productionsToCFG
-, toSym
-, toLabel
-, unsafeToSym
-, unsafeToLabel
-, sentenceToSym
-, sentencesToSym
-, sentenceToLabel
-, sentencesToLabel
+-- * Context-free grammars over alphabets of specific types
 , CharCFG
 , productionsToCharCFG
 , StringCFG
@@ -30,38 +43,113 @@ import qualified Data.Set as S
 import Data.Maybe (maybeToList, fromJust)
 import Data.Foldable (foldr')
 
+{- |
+A type class that specifies how grammar datatypes should behave. A production
+rule is represented by a list of symbols. Alternative production rules
+associated with the same symbol are represented as lists of lists.
+-}
 class Grammar g where
+    -- | The type of the elements of the alphabet described by the grammar @g@.
     type Repr g :: *
+    -- | @productions gr sym@ returns the productions associated with symbol @sym@ in grammar @gr@.
     productions :: g -> Repr g -> [[Repr g]]
+    -- | Convert a symbol to a 'String'.
     showSymbol :: g -> Repr g -> String
+    -- | Is this symbol part of the grammar?
     isInGrammar :: Repr g -> g -> Bool
     isInGrammar x gr = not $ isNotInGrammar x gr
+    -- | Is this symbol part of the grammar?
     isNotInGrammar :: Repr g -> g -> Bool
     isNotInGrammar x gr = not $ isInGrammar x gr
+    -- | Returns the set of all symbols used in the grammar
     getSymbols :: g -> S.Set (Repr g)
+    -- | Returns the set of all terminals used in the grammar
     getTerminals :: g -> S.Set (Repr g)
+    -- | Returns the set of all nonterminals used in the grammar
     getNonTerminals :: g -> S.Set (Repr g)
 
-showSentence :: Grammar g => g -> [Repr g] -> String
+{- $examplegrammar #examplegrammar#
+   We illustrate the pretty-printing functionality with the following example grammar:
+
+   > exampleKeyValue :: [(Char, [String])]
+   > exampleKeyValue = let initialChars = map (:[]) ['a'..'c']
+   >                       chars = ['a'..'c'] ++ ['0'..'3']
+   >                       expansions = map (\c -> ['I', c]) chars
+   >                    in [ ('E', ["E+E", "E*E", "(E)", "I"])
+   >                       , ('I', initialChars ++ expansions)
+   >                       ]
+   >
+   > exampleGrammar :: CharCFG
+   > exampleGrammar = productionsToCharCFG exampleKeyValue
+-}
+
+
+-- | Pretty-print a sentence (a sequence of symbols).
+showSentence :: Grammar g
+             => g           -- ^ the grammar
+             -> [Repr g]    -- ^ the sentence
+             -> String      -- ^ the sentence, pretty-printed as a String
 showSentence grammar sent = concatMap (showSymbol grammar) sent
 
-showProductions :: Grammar g => g -> Repr g -> [[Repr g]] -> String
-showProductions grammar sym ls = let header = showSymbol grammar sym
-                                  in concatMap (\l -> header ++ " -> " ++ showSentence grammar l ++ "\n") ls
+{- | Pretty-print all the production rules associated with a synbol.
 
-showGrammar :: Grammar g => g -> String
+   >>> putStrLn $ showProductions exampleGrammar 'E'
+   E -> E+E
+   E -> E*E
+   E -> (E)
+   E -> I
+-}
+showProductions :: Grammar g
+                => g            -- ^ the grammar
+                -> Repr g       -- ^ the symbol on the left-hand side of the rule
+                -> String       -- ^ the pretty-printed production rule
+showProductions grammar sym = let header = showSymbol grammar sym
+                                  ls = productions grammar sym
+                               in concatMap (\l -> header ++ " -> " ++ showSentence grammar l ++ "\n") ls
+
+{- | Pretty-print all the production rules in a grammar.
+
+   >>> putStrLn $ showGrammar exampleGrammar
+   E -> E+E
+   E -> E*E
+   E -> (E)
+   E -> I
+   I -> a
+   I -> b
+   I -> c
+   I -> Ia
+   I -> Ib
+   I -> Ic
+   I -> I0
+   I -> I1
+   I -> I2
+   I -> I3
+-}
+showGrammar :: Grammar g
+            => g        -- ^ the grammar
+            -> String   -- ^ its pretty-printed representation as a String
 showGrammar grammar = let symbols = S.toList $ getSymbols grammar
-                          prods = map (productions grammar) symbols
-                       in concatMap (\(s, p) -> showProductions grammar s p) $ zip symbols prods
+                       in concatMap (showProductions grammar) symbols
 
-
-pick :: Grammar g => Int -> g -> Repr g -> [Repr g]
+-- | Pick the @n@-th production rule associated with a given symbol. WARNING:
+--   unsafe if @n@ is out of bounds.
+pick :: Grammar g
+     => Int         -- ^ the rank of the selected rule
+     -> g           -- ^ the grammar
+     -> Repr g      -- ^ the nonterminal symbol
+     -> [Repr g]    -- ^ the associated production rule
 pick n grammar sym = productions grammar sym !! n
 
+{- |
+The IntCFG datatype implements a context-free grammar as a set of production
+rules between strings of integers. The datatype requires the integers appearing
+in the grammar to be consecutive, starting at @0@. This invariant is enforced
+on construction (see 'productionsToIntCFG'). The production rules are
+internally represented as an 'Data.IntMap.IntMap [Int]'. For efficiency
+reasons, the 'CFG' datatype is built upon an 'IntCFG'.
+-}
 
-data IntCFG = IntCFG Int                    -- ^ The next free symbol that can be used in the grammar.
-                     (IM.IntMap [[Int]])    -- ^ The production rules.
-                     deriving (Eq, Ord)
+data IntCFG = IntCFG Int (IM.IntMap [[Int]]) deriving (Eq, Ord)
 
 productionsInt :: IntCFG -> Int -> [[Int]]
 productionsInt (IntCFG _ prods) nt = let inMap = IM.lookup nt prods
@@ -94,6 +182,7 @@ invertIntMap = IM.foldrWithKey' (\ key val inverse -> IM.insert val key inverse)
 invertMap :: Ord a => IM.IntMap a -> M.Map a Int
 invertMap = IM.foldrWithKey' (\ key val inverse -> M.insert val key inverse) M.empty
 
+-- | Build an 'IntCFG' from an association list of @(nonterminal, productions)@ pairs.
 productionsToIntCFG :: [(Int, [[Int]])] -> (IntCFG, IM.IntMap Int, IM.IntMap Int)
 productionsToIntCFG kvs = let (keys, values) = unzip kvs
                               uniqueKeys = S.fromList keys
@@ -115,7 +204,13 @@ instance Grammar IntCFG where
     getNonTerminals = getNonTerminalsInt
 
 
-
+{- | A datatype representing context-free grammars over alphabets of arbitrary
+type. The implementation uses an 'IntCFG' grammar to represent the relations
+between the symbols. Conversion from the representation type (i.e. @a@) to
+@Int@ are handled by a @Data.Map.Map@; this implies that, for the most part,
+the type variable @a@ is required to be in class @Ord@, although this
+constraint is not enforced at the level of the datatype.
+-}
 data CFG a = CFG IntCFG (M.Map a Int) (IM.IntMap a)
              deriving (Eq, Ord)
 
@@ -128,14 +223,14 @@ unsafeToSym dict = fromJust . (toSym dict)
 toLabel :: IM.IntMap a -> Int -> Maybe a
 toLabel dict sym = IM.lookup sym dict
 
-unsafeToLabel :: Ord a => IM.IntMap a -> Int -> a
-unsafeToLabel dict = fromJust . (toLabel dict)
+--unsafeToLabel :: Ord a => IM.IntMap a -> Int -> a
+--unsafeToLabel dict = fromJust . (toLabel dict)
 
-sentenceToSym :: Ord a => M.Map a Int -> [a] -> [Int]
-sentenceToSym dict sentence = concatMap (maybeToList . (toSym dict)) sentence
+--sentenceToSym :: Ord a => M.Map a Int -> [a] -> [Int]
+--sentenceToSym dict sentence = concatMap (maybeToList . (toSym dict)) sentence
 
-sentencesToSym :: Ord a => M.Map a Int -> [[a]] -> [[Int]]
-sentencesToSym dict sentences = map (sentenceToSym dict) sentences
+--sentencesToSym :: Ord a => M.Map a Int -> [[a]] -> [[Int]]
+--sentencesToSym dict sentences = map (sentenceToSym dict) sentences
 
 sentenceToLabel :: IM.IntMap a -> [Int] -> [a]
 sentenceToLabel dict sentence = concatMap (maybeToList . (toLabel dict)) sentence
@@ -149,6 +244,20 @@ prodsToIntProds dict ((k,vals):prods) = let k' = fromJust $ M.lookup k dict
                                          in (k', vals'):prodsToIntProds dict prods
 prodsToIntProds _ [] = []
 
+{- | Build a 'CFG' from an association list of @(nonterminal, productions)@
+     pairs. Here a production is a list of lists of symbols.
+
+   > exampleKeyValue :: [(Char, [String])]
+   > exampleKeyValue = let initialChars = map (:[]) ['a'..'c']
+   >                       chars = ['a'..'c'] ++ ['0'..'3']
+   >                       expansions = map (\c -> ['I', c]) chars
+   >                    in [ ('E', ["E+E", "E*E", "(E)", "I"])
+   >                       , ('I', initialChars ++ expansions)
+   >                       ]
+   >
+   > exampleGrammar :: CharCFG
+   > exampleGrammar = productionsToCharCFG exampleKeyValue
+-}
 productionsToCFG :: Ord a => [(a, [[a]])] -> CFG a
 productionsToCFG kvs = let (keys, values) = unzip kvs
                            uniqueKeys = S.fromList keys
@@ -200,6 +309,16 @@ instance (Ord a, Show a) => Grammar (CFG a) where
 
 instance (Show a, Ord a) => Show (CFG a) where show g = showGrammar g
 
+
+{- | A newtype for @Char@-based context-free grammars. This is solely done to
+     improve the pretty-printing representation of the grammar symbols.
+     Compare:
+
+     >>> putStrLn $ showGrammar (productionsToCFG [('A', ["a"])])
+     'A' -> 'a'
+     >>> putStrLn $ showGrammar (productionsToCharCFG [('A', ["a"])])
+     A -> a
+-}
 newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord)
 
 instance Grammar CharCFG where
@@ -212,11 +331,21 @@ instance Grammar CharCFG where
     getTerminals (CharCFG g) = getTerminalsCFG g
     getNonTerminals (CharCFG g) = getNonTerminalsCFG g
 
+-- | Build a 'CharCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToCharCFG :: [(Char, [String])] -> CharCFG
 productionsToCharCFG = CharCFG . productionsToCFG
 
 instance Show CharCFG where show g = showGrammar g
 
+{- | A newtype for @String@-based context-free grammars. This is solely done to
+     improve the pretty-printing representation of the grammar symbols.
+     Compare:
+
+     >>> putStrLn $ showGrammar (productionsToCFG [("NONTERM", [["term"]])])
+     "NONTERM" -> "term"
+     >>> putStrLn $ showGrammar (productionsToStringCFG [("NONTERM", [["term"]])])
+     NONTERM -> term
+-}
 newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord)
 
 instance Grammar StringCFG where
@@ -229,6 +358,7 @@ instance Grammar StringCFG where
     getTerminals (StringCFG g) = getTerminalsCFG g
     getNonTerminals (StringCFG g) = getNonTerminalsCFG g
 
+-- | Build a 'StringCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToStringCFG :: [(String, [[String]])] -> StringCFG
 productionsToStringCFG = StringCFG . productionsToCFG
 
