@@ -7,7 +7,7 @@ Maintainer  : arekfu@gmail.com
 Stability   : experimental
 Portability : POSIX
 
-This module contains the most important datatypes of the @Grammar@ package and
+This module contains the most important datatypes of the 'Grammar' package and
 the functions that operate on them.
 -}
 
@@ -15,7 +15,7 @@ the functions that operate on them.
 
 module Grammar.Internal
 (
--- * The 'Grammar' type class
+-- * The 'Grammar' typeclass
   Grammar(..)
 , pick
 -- ** Pretty-printing parts of a grammar
@@ -44,7 +44,7 @@ import Data.Maybe (maybeToList, fromJust)
 import Data.Foldable (foldr')
 
 {- |
-A type class that specifies how grammar datatypes should behave. A production
+A typeclass that specifies how grammar datatypes should behave. A production
 rule is represented by a list of symbols. Alternative production rules
 associated with the same symbol are represented as lists of lists.
 -}
@@ -134,7 +134,7 @@ showGrammar grammar = let symbols = S.toList $ getSymbols grammar
 -- | Pick the @n@-th production rule associated with a given symbol. WARNING:
 --   unsafe if @n@ is out of bounds.
 pick :: Grammar g
-     => Int         -- ^ the rank of the selected rule
+     => Int         -- ^ @n@, the rank of the selected rule
      -> g           -- ^ the grammar
      -> Repr g      -- ^ the nonterminal symbol
      -> [Repr g]    -- ^ the associated production rule
@@ -206,10 +206,16 @@ instance Grammar IntCFG where
 
 {- | A datatype representing context-free grammars over alphabets of arbitrary
 type. The implementation uses an 'IntCFG' grammar to represent the relations
-between the symbols. Conversion from the representation type (i.e. @a@) to
-@Int@ are handled by a @Data.Map.Map@; this implies that, for the most part,
-the type variable @a@ is required to be in class @Ord@, although this
-constraint is not enforced at the level of the datatype.
+between the symbols.
+
+Conversion from __labels__ (i.e. objects of the external representation type,
+@a@) to __symbols__ (i.e. 'Int's, the internal representation type) are
+represented by a 'Data.Map.Map'; this implies that, for the most part, the type
+variable @a@ is required to be in class 'Ord', although this constraint is not
+enforced at the level of the datatype.
+
+Conversion in the opposite direction (from __symbols__ to __labels__) are
+represented by a 'Data.IntMap.IntMap'.
 -}
 data CFG a = CFG IntCFG (M.Map a Int) (IM.IntMap a)
              deriving (Eq, Ord)
@@ -307,10 +313,10 @@ instance (Ord a, Show a) => Grammar (CFG a) where
     getTerminals = getTerminalsCFG
     getNonTerminals = getNonTerminalsCFG
 
-instance (Show a, Ord a) => Show (CFG a) where show g = showGrammar g
+instance (Ord a, Show a) => Show (CFG a) where show g = showGrammar g
 
 
-{- | A newtype for @Char@-based context-free grammars. This is solely done to
+{- | A newtype for 'Char'-based context-free grammars. This is solely done to
      improve the pretty-printing representation of the grammar symbols.
      Compare:
 
@@ -337,7 +343,7 @@ productionsToCharCFG = CharCFG . productionsToCFG
 
 instance Show CharCFG where show g = showGrammar g
 
-{- | A newtype for @String@-based context-free grammars. This is solely done to
+{- | A newtype for 'String'-based context-free grammars. This is solely done to
      improve the pretty-printing representation of the grammar symbols.
      Compare:
 
