@@ -48,7 +48,7 @@ module Grammar.Internal
 import qualified Data.Map.Strict as M
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Set as S
-import Data.Maybe (mapMaybe, fromJust)
+import Data.Maybe (maybeToList, mapMaybe, fromJust)
 import Data.Foldable (foldr')
 
 {- |
