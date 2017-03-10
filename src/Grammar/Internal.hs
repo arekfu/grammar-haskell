@@ -24,10 +24,22 @@ module Grammar.Internal
 , showProductions
 , showGrammar
 -- * Context-free grammars over alphabets of integers
-, IntCFG
+, IntCFG(..)
+-- ** Type synonims
+, Symbol
+, Sentence
+, Renumbering
+, InverseRenumbering
+-- ** Manipulation functions
 , productionsToIntCFG
+, renumberSym
+, renumberSentence
+, inverseRenumberSym
+, inverseRenumberSentence
+, collectSymbols
+, renumberMap
 -- * Context free grammars over alphabets of arbitrary types
-, CFG
+, CFG(..)
 , productionsToCFG
 , toLabel
 , toSym
@@ -38,9 +50,9 @@ module Grammar.Internal
 , sentenceToLabel
 , sentencesToLabel
 -- * Context-free grammars over alphabets of specific types
-, CharCFG
+, CharCFG(..)
 , productionsToCharCFG
-, StringCFG
+, StringCFG(..)
 , productionsToStringCFG
 ) where
 
@@ -48,8 +60,10 @@ module Grammar.Internal
 import qualified Data.Map.Strict as M
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Set as S
+import qualified Data.IntSet as IS
 import Data.Maybe (maybeToList, mapMaybe, fromJust)
 import Data.Foldable (foldr')
+import qualified Data.Vector.Unboxed as VU
 
 {- |
 A typeclass that specifies how grammar datatypes should behave. A production
@@ -177,14 +191,73 @@ insertInIntMap c (n, syms) = (n+1, IM.insert n c syms)
 invertMap :: Ord a => IM.IntMap a -> M.Map a Symbol
 invertMap = IM.foldrWithKey' (\ key val inverse -> M.insert val key inverse) M.empty
 
--- | Build an 'IntCFG' from an association list of @(nonterminal, productions)@ pairs.
-productionsToIntCFG :: [(Symbol, [Sentence])] -> IntCFG
-productionsToIntCFG kvs = let (keys, values) = unzip kvs
-                              maxKey = maximum keys
-                              maxValue = maximum $ maximum $ maximum values
-                              maxSym = max maxKey maxValue + 1
-                              prods = IM.fromList kvs
-                           in IntCFG maxSym prods
+-- | Type synonim for a 'Data.Vector.Unboxed.Vector' of 'Int's.
+type Renumbering = VU.Vector Int
+
+-- | Type synonim for a 'Data.IntMap.IntMap' of 'Int's.
+type InverseRenumbering = IM.IntMap Int
+
+-- | Invert an 'Int'-to-'Int' renumbering.
+invert :: Renumbering -> InverseRenumbering
+invert = VU.ifoldr' (\i sym inverse -> IM.insert sym i inverse) IM.empty
+
+-- | Apply the renumbering to a given 'Symbol'.
+renumberSym :: Renumbering -> Symbol -> Symbol
+renumberSym renumb sym = case renumb VU.!? sym of
+                            Just n -> n
+                            Nothing -> error ("Out of bounds: " ++ show sym ++ "/" ++ show (VU.length renumb))
+
+-- | Apply the renumbering to a given 'Sentence'
+renumberSentence :: Renumbering -> Sentence -> Sentence
+renumberSentence renumb = map (renumberSym renumb)
+
+-- | Apply the inverse renumbering to a given 'Symbol'
+inverseRenumberSym :: InverseRenumbering -> Symbol -> Symbol
+inverseRenumberSym iRenumb sym = fromJust $ IM.lookup sym iRenumb
+
+-- | Apply the inverse renumbering to a given 'Sentence'
+inverseRenumberSentence :: InverseRenumbering -> Sentence -> Sentence
+inverseRenumberSentence iRenumb = map (inverseRenumberSym iRenumb)
+
+-- | Return all symbols appearing in a set of (integer) production rules.
+collectSymbols :: IM.IntMap [Sentence] -> IS.IntSet
+collectSymbols =
+    let insertSentences :: IS.IntSet -> [Sentence] -> IS.IntSet
+        insertSentences set sentences = foldr' (\v set' -> IS.insert v set') set $ concat sentences
+     in IM.foldrWithKey (\key values set -> insertSentences (IS.insert key set) values) IS.empty
+
+-- | Renumber the @n@ integers that appear as keys and values of the map in
+--   such a way that they exactly span the @[0,n-1]@ interval. The
+--   correspondence between the new and the old numbering scheme
+--   ('Renumbering') is returned as a 'Data.Vector.Unboxed.Vector'. The inverse
+--   mapping is returned as an 'Data.IntMap.IntMap'.
+renumberMap :: IM.IntMap [Sentence] -- ^ The map to renumber
+            -> (IM.IntMap [Sentence], Renumbering, InverseRenumbering)  -- ^ The renumbered map, the new-to-old mapping and the old-to-new mapping
+renumberMap intMap = let allSyms = collectSymbols intMap
+                         renumbering = VU.fromList $ IS.toList allSyms
+                         inverseRenumbering = invert renumbering
+                         intMap' = IM.mapKeys (inverseRenumberSym inverseRenumbering) intMap
+                         intMap'' = IM.map (map (inverseRenumberSentence inverseRenumbering)) intMap'
+                      in (intMap'', renumbering, inverseRenumbering)
+
+{- | Build an 'IntCFG' from an association list of @(nonterminal, productions)@
+     pairs. The Symbols appearing in the association list are renumbered to
+     enforce the invariant that they span the @[0,n-1]@ range. The renumbering
+     is returned along with the built grammar, in the form of a
+     'Data.Vector.Unboxed.Vector' 'Symbol' indexed by the renumbered symbols.
+-}
+productionsToIntCFG :: [(Symbol, [Sentence])] -> (IntCFG, Renumbering, InverseRenumbering)
+productionsToIntCFG kvs = let intMap = productionsToIntMap kvs
+                              (intMap', renumbering, inverseRenumbering) = renumberMap intMap
+                              maxSym = VU.length renumbering - 1
+                           in (IntCFG maxSym intMap', renumbering, inverseRenumbering)
+
+{- | Provide the fundamental building block to construct an 'IntCFG' from an
+     association list of @(nonterminal, productions)@ pairs. The Symbols are
+     not guaranteed to span the @[0,n-1]@ range.
+-}
+productionsToIntMap :: [(Symbol, [Sentence])] -> IM.IntMap [Sentence]
+productionsToIntMap kvs = IM.fromList kvs
 
 instance Grammar IntCFG where
     type Repr IntCFG = Symbol
@@ -195,6 +268,8 @@ instance Grammar IntCFG where
     getSymbols = getSymbolsInt
     getTerminals = getTerminalsInt
     getNonTerminals = getNonTerminalsInt
+
+instance Show IntCFG where show = showGrammar
 
 
 {- | A datatype representing context-free grammars over alphabets of arbitrary
