@@ -13,7 +13,9 @@ import qualified Data.IntSet as IS
 -- local imports
 import Grammar.Internal
 
--- some properties to test the functions that manipulate IntMaps, IntSets, etc.
+------------------------------------------------------------------------------------
+--  some properties to test the functions that manipulate IntMaps, IntSets, etc.  --
+------------------------------------------------------------------------------------
 
 -- | All the map keys (nonterminals) and all the element of the sententials
 --   must be found as symbols.
@@ -32,6 +34,42 @@ prop_renumber intMap = let (intMap', renumbering, inverseRenumbering) = renumber
                            nSyms = IS.size $ collectSymbols intMap
                         in nRules === IM.size intMap' .&&. nSyms === VU.length renumbering .&&. nSyms === IM.size inverseRenumbering
 
+-----------------------------------------
+--  now some properties about IntCFGs  --
+-----------------------------------------
+
+symMin :: Int
+symMin = -10
+
+symMax :: Int
+symMax = 10
+
+newtype ASymbol = ASymbol Symbol deriving (Eq, Ord, Show)
+instance Arbitrary ASymbol where
+    arbitrary = ASymbol <$> elements [symMin..symMax]
+
+maxSentenceLength :: Int
+maxSentenceLength = 4
+
+newtype ASentence = ASentence Sentence deriving (Eq, Ord, Show)
+instance Arbitrary ASentence where
+    arbitrary = do len <- elements [1..maxSentenceLength]
+                   ASentence <$> vectorOf len arbitrary
+
+unwrap :: (ASymbol, [ASentence]) -> (Symbol, [Sentence])
+unwrap (ASymbol sym, sents) = (sym, map (\(ASentence sent) -> sent) sents)
+
+newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
+instance Arbitrary AIntCFG where
+    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ASymbol, [ASentence])]
+                   let kvs = map unwrap akvs
+                   let (grammar, _, _) = productionsToIntCFG kvs
+                   return $ AIntCFG grammar
+
+prop_maxSym :: AIntCFG -> Property
+prop_maxSym (AIntCFG (IntCFG maxSym intMap)) =
+    let syms = collectSymbols intMap
+     in all (<= maxSym) (IS.toList syms) .&&. IS.findMax syms === maxSym
 
 newtype Terminal = Terminal { terminalAsChar :: Char } deriving (Eq, Ord)
 instance Show Terminal where show (Terminal c) = [c]
@@ -60,34 +98,6 @@ instance Arbitrary ACharCFG where
 
 --prop_terminalsDisjointNonterminals :: ACharCFG -> Bool
 --prop_terminalsDisjointNonterminals (ACharCFG g) = null $ getTerminals g `S.intersection` getNonTerminals g
-
-symMin :: Int
-symMin = -10
-
-symMax :: Int
-symMax = 10
-
-newtype ASymbol = ASymbol Symbol deriving (Eq, Ord, Show)
-instance Arbitrary ASymbol where
-    arbitrary = ASymbol <$> elements [symMin..symMax]
-
-maxSentenceLength :: Int
-maxSentenceLength = 4
-
-newtype ASentence = ASentence Sentence deriving (Eq, Ord, Show)
-instance Arbitrary ASentence where
-    arbitrary = do len <- elements [1..maxSentenceLength]
-                   ASentence <$> vectorOf len arbitrary
-
-unwrap :: (ASymbol, [ASentence]) -> (Symbol, [Sentence])
-unwrap (ASymbol sym, sents) = (sym, map (\(ASentence sent) -> sent) sents)
-
-newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
-instance Arbitrary AIntCFG where
-    arbitrary = do akvs <- arbitrary :: Gen [(ASymbol, [ASentence])]
-                   let kvs = map unwrap akvs
-                   let (grammar, _, _) = productionsToIntCFG kvs
-                   return $ AIntCFG grammar
 
 
 return []
