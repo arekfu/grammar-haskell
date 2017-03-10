@@ -48,7 +48,7 @@ module Grammar.Internal
 import qualified Data.Map.Strict as M
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Set as S
-import Data.Maybe (maybeToList, fromJust)
+import Data.Maybe (mapMaybe, fromJust)
 import Data.Foldable (foldr')
 
 {- |
@@ -97,7 +97,7 @@ showSentence :: Grammar g
              => g           -- ^ the grammar
              -> [Repr g]    -- ^ the sentence
              -> String      -- ^ the sentence, pretty-printed as a String
-showSentence grammar sent = concatMap (showSymbol grammar) sent
+showSentence grammar = concatMap (showSymbol grammar)
 
 {- | Pretty-print all the production rules associated with a synbol.
 
@@ -176,7 +176,7 @@ getSymbolsInt :: IntCFG -> S.Set Symbol
 getSymbolsInt (IntCFG n _) = S.fromDistinctAscList [0..n-1]
 
 getTerminalsInt :: IntCFG -> S.Set Symbol
-getTerminalsInt gr = (getSymbolsInt gr) `S.difference` (getNonTerminalsInt gr)
+getTerminalsInt gr = getSymbolsInt gr `S.difference` getNonTerminalsInt gr
 
 getNonTerminalsInt :: IntCFG -> S.Set Symbol
 getNonTerminalsInt (IntCFG _ prods) = S.fromList $ IM.keys prods
@@ -194,7 +194,7 @@ productionsToIntCFG :: [(Symbol, [Sentence])] -> IntCFG
 productionsToIntCFG kvs = let (keys, values) = unzip kvs
                               maxKey = maximum keys
                               maxValue = maximum $ maximum $ maximum values
-                              maxSym = (max maxKey maxValue) + 1
+                              maxSym = max maxKey maxValue + 1
                               prods = IM.fromList kvs
                            in IntCFG maxSym prods
 
@@ -234,7 +234,7 @@ toSym dict label = M.lookup label dict
 
 -- | Like 'toSym', but assume the label is in the dictionary.
 unsafeToSym :: Ord a => M.Map a Symbol -> a -> Symbol
-unsafeToSym dict = fromJust . (toSym dict)
+unsafeToSym dict = fromJust . toSym dict
 
 -- | Convert a label to a symbol, given a dictionary.
 toLabel :: IM.IntMap a  -- ^ the symbol-to-label dictionary
@@ -244,25 +244,25 @@ toLabel dict sym = IM.lookup sym dict
 
 -- | Like 'toLabel', but assume the label is in the dictionary.
 unsafeToLabel :: Ord a => IM.IntMap a -> Symbol -> a
-unsafeToLabel dict = fromJust . (toLabel dict)
+unsafeToLabel dict = fromJust . toLabel dict
 
 -- | Convert a list of labels (a sentence) to a list of symbols. Labels that
 --   do not belong to the grammar alphabet are silently expunged.
 sentenceToSym :: Ord a => M.Map a Symbol -> [a] -> Sentence
-sentenceToSym dict sentence = concatMap (maybeToList . (toSym dict)) sentence
+sentenceToSym dict = mapMaybe (toSym dict)
 
 -- | Convert a list of label sentences to a list of symbol sentences.
 sentencesToSym :: Ord a => M.Map a Symbol -> [[a]] -> [Sentence]
-sentencesToSym dict sentences = map (sentenceToSym dict) sentences
+sentencesToSym dict = map (sentenceToSym dict)
 
 -- | Convert a list of symbols (a sentence) to a list of labels. Symbols that
 --   do not belong to the grammar alphabet are silently expunged.
 sentenceToLabel :: IM.IntMap a -> Sentence -> [a]
-sentenceToLabel dict sentence = concatMap (maybeToList . (toLabel dict)) sentence
+sentenceToLabel dict = mapMaybe (toLabel dict)
 
 -- | Convert a list of symbol sentences to a list of label sentences.
 sentencesToLabel :: IM.IntMap a -> [Sentence] -> [[a]]
-sentencesToLabel dict sentences = map (sentenceToLabel dict) sentences
+sentencesToLabel dict = map (sentenceToLabel dict)
 
 prodsToIntProds :: Ord a => M.Map a Symbol -> [(a, [[a]])] -> [(Symbol, [Sentence])]
 prodsToIntProds dict ((k,vals):prods) = let k' = fromJust $ M.lookup k dict
@@ -333,7 +333,7 @@ instance (Ord a, Show a) => Grammar (CFG a) where
     getTerminals = getTerminalsCFG
     getNonTerminals = getNonTerminalsCFG
 
-instance (Ord a, Show a) => Show (CFG a) where show g = showGrammar g
+instance (Ord a, Show a) => Show (CFG a) where show = showGrammar
 
 
 {- | A newtype for 'Char'-based context-free grammars. This is solely done to
@@ -361,7 +361,7 @@ instance Grammar CharCFG where
 productionsToCharCFG :: [(Char, [String])] -> CharCFG
 productionsToCharCFG = CharCFG . productionsToCFG
 
-instance Show CharCFG where show g = showGrammar g
+instance Show CharCFG where show = showGrammar
 
 {- | A newtype for 'String'-based context-free grammars. This is solely done to
      improve the pretty-printing representation of the grammar symbols.
@@ -388,4 +388,4 @@ instance Grammar StringCFG where
 productionsToStringCFG :: [(String, [[String]])] -> StringCFG
 productionsToStringCFG = StringCFG . productionsToCFG
 
-instance Show StringCFG where show g = showGrammar g
+instance Show StringCFG where show = showGrammar

@@ -113,7 +113,7 @@ randomSentExpand :: (Grammar g, Ord (Repr g))
                  => g           -- ^ the grammar
                  -> [Repr g]    -- ^ the sentence to expand
                  -> MC [Repr g] -- ^ the resulting sentence
-randomSentExpand g syms = do sents <- sequence $ map (randomSymExpand g) syms
+randomSentExpand g syms = do sents <- mapM (randomSymExpand g) syms
                              return $ concat sents
 
 -- | Recursively and randomly expand a sentence until it consists solely of
@@ -150,4 +150,4 @@ randomSentDeriveScan grammar sent =
     do expanded <- randomSentExpand grammar sent
        if sent == expanded
        then return [expanded]
-       else liftM (expanded:) (randomSentDeriveScan grammar expanded)
+       else fmap (expanded:) (randomSentDeriveScan grammar expanded)

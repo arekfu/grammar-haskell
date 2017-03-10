@@ -14,12 +14,12 @@ import Grammar
 newtype Terminal = Terminal { terminalAsChar :: Char } deriving (Eq, Ord)
 instance Show Terminal where show (Terminal c) = [c]
 instance Arbitrary Terminal where
-    arbitrary = Terminal <$> (elements $ ['_', '+', '*'] ++ ['a'..'z'] ++ ['0'..'9'])
+    arbitrary = Terminal <$> elements (['_', '+', '*'] ++ ['a'..'z'] ++ ['0'..'9'])
 
 newtype NonTerminal = NonTerminal { nonTerminalAsChar :: Char } deriving (Eq, Ord)
 instance Show NonTerminal where show (NonTerminal c) = [c]
 instance Arbitrary NonTerminal where
-    arbitrary = NonTerminal <$> (elements ['A'..'Z'])
+    arbitrary = NonTerminal <$> elements ['A'..'Z']
 
 newtype ACSG = ACSG CharCFG deriving (Show, Eq)
 instance Arbitrary ACSG where
@@ -37,7 +37,7 @@ instance Arbitrary ACSG where
 
 
 prop_terminalsDisjointNonterminals :: ACSG -> Bool
-prop_terminalsDisjointNonterminals (ACSG g) = null $ (getTerminals g) `S.intersection` (getNonTerminals g)
+prop_terminalsDisjointNonterminals (ACSG g) = null $ getTerminals g `S.intersection` getNonTerminals g
 
 return []
 runTests :: IO Bool
