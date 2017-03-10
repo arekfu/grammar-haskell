@@ -360,7 +360,8 @@ productionsToCFG kvs = let (keys, values) = unzip kvs
                            uniqueKeys = S.fromList keys
                            uniqueValues = foldr' S.insert uniqueKeys $ concat $ concat values
                            uniqueLabels = uniqueKeys `S.union` uniqueValues
-                           (maxSym, symsToLabels) = S.foldr' insertInIntMap (0, IM.empty) uniqueLabels
+                           (nextSym, symsToLabels) = S.foldr' insertInIntMap (0, IM.empty) uniqueLabels
+                           maxSym = nextSym - 1
                            labelsToSyms = invertMap symsToLabels
                            prods = IM.fromList $ prodsToIntProds labelsToSyms kvs
                         in CFG (IntCFG maxSym prods) labelsToSyms symsToLabels
