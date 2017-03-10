@@ -2,7 +2,7 @@
 Module      : Grammar.Random
 Description : Functions to randomly expand symbols according to a grammar.
 Copyright   : (c) Davide Mancusi, 2017
-License     : BSD
+License     : BSD3
 Maintainer  : arekfu@gmail.com
 Stability   : experimental
 Portability : POSIX

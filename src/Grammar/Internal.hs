@@ -2,7 +2,7 @@
 Module      : Grammar.Internal
 Description : Datatypes and main functions for CFG grammars.
 Copyright   : (c) Davide Mancusi, 2017
-License     : BSD
+License     : BSD3
 Maintainer  : arekfu@gmail.com
 Stability   : experimental
 Portability : POSIX

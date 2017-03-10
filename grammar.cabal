@@ -6,7 +6,7 @@ homepage:            https://github.com/arekfu/grammar#readme
 license:             BSD3
 license-file:        LICENSE
 author:              Davide Mancusi
-maintainer:          arekfu@gmail.com
+maintainer:          Davide Mancusi <arekfu@gmail.com>
 copyright:           2017 Davide Mancusi
 category:            Formal Languages
 build-type:          Simple
