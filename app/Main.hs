@@ -1,6 +1,7 @@
 module Main where
 
 import Grammar
+import Grammar.Random
 
 exampleKeyValue :: [(Char, [String])]
 exampleKeyValue = let initialChars = map (:[]) ['a'..'c']
