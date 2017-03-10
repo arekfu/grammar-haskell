@@ -223,7 +223,7 @@ inverseRenumberSentence iRenumb = map (inverseRenumberSym iRenumb)
 collectSymbols :: IM.IntMap [Sentence] -> IS.IntSet
 collectSymbols =
     let insertSentences :: IS.IntSet -> [Sentence] -> IS.IntSet
-        insertSentences set sentences = foldr' (\v set' -> IS.insert v set') set $ concat sentences
+        insertSentences set sentences = foldr' IS.insert set $ concat sentences
      in IM.foldrWithKey (\key values set -> insertSentences (IS.insert key set) values) IS.empty
 
 -- | Renumber the @n@ integers that appear as keys and values of the map in
@@ -263,7 +263,7 @@ intMapToIntCFG intMap = let (intMap', renumbering, inverseRenumbering) = renumbe
      not guaranteed to span the @[0,n-1]@ range.
 -}
 productionsToIntMap :: [(Symbol, [Sentence])] -> IM.IntMap [Sentence]
-productionsToIntMap kvs = IM.fromList kvs
+productionsToIntMap = IM.fromList
 
 instance Grammar IntCFG where
     type Repr IntCFG = Symbol
