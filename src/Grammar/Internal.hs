@@ -31,6 +31,8 @@ module Grammar.Internal
 , Renumbering
 , InverseRenumbering
 -- ** Manipulation functions
+, productionsToIntMap
+, intMapToIntCFG
 , productionsToIntCFG
 , renumberSym
 , renumberSentence
@@ -247,10 +249,16 @@ renumberMap intMap = let allSyms = collectSymbols intMap
      'Data.Vector.Unboxed.Vector' 'Symbol' indexed by the renumbered symbols.
 -}
 productionsToIntCFG :: [(Symbol, [Sentence])] -> (IntCFG, Renumbering, InverseRenumbering)
-productionsToIntCFG kvs = let intMap = productionsToIntMap kvs
-                              (intMap', renumbering, inverseRenumbering) = renumberMap intMap
-                              maxSym = VU.length renumbering - 1
-                           in (IntCFG maxSym intMap', renumbering, inverseRenumbering)
+productionsToIntCFG = intMapToIntCFG . productionsToIntMap
+
+{- | Build an 'IntCFG' from an 'Data.IntMap.IntMap' between 'Symbol's. The
+     'Symbols' will be renumbered as specified in the second and third return
+     values.
+-}
+intMapToIntCFG :: IM.IntMap [Sentence] -> (IntCFG, Renumbering, InverseRenumbering)
+intMapToIntCFG intMap = let (intMap', renumbering, inverseRenumbering) = renumberMap intMap
+                            maxSym = VU.length renumbering - 1
+                         in (IntCFG maxSym intMap', renumbering, inverseRenumbering)
 
 {- | Provide the fundamental building block to construct an 'IntCFG' from an
      association list of @(nonterminal, productions)@ pairs. The Symbols are
