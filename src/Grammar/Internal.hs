@@ -29,6 +29,14 @@ module Grammar.Internal
 -- * Context free grammars over alphabets of arbitrary types
 , CFG
 , productionsToCFG
+, toLabel
+, toSym
+, unsafeToLabel
+, unsafeToSym
+, sentenceToSym
+, sentencesToSym
+, sentenceToLabel
+, sentencesToLabel
 -- * Context-free grammars over alphabets of specific types
 , CharCFG
 , productionsToCharCFG
@@ -220,27 +228,42 @@ represented by a 'Data.IntMap.IntMap'.
 data CFG a = CFG IntCFG (M.Map a Int) (IM.IntMap a)
              deriving (Eq, Ord)
 
-toSym :: Ord a => M.Map a Int -> a -> Maybe Int
+-- | Convert a label to a symbol, given a dictionary.
+toSym :: Ord a
+      => M.Map a Int    -- ^ the label-to-symbol dictionary
+      -> a              -- ^ the label to convert
+      -> Maybe Int      -- ^ the resulting symbol, maybe
 toSym dict label = M.lookup label dict
 
+-- | Like 'toSym', but assume the label is in the dictionary.
 unsafeToSym :: Ord a => M.Map a Int -> a -> Int
 unsafeToSym dict = fromJust . (toSym dict)
 
-toLabel :: IM.IntMap a -> Int -> Maybe a
+-- | Convert a label to a symbol, given a dictionary.
+toLabel :: IM.IntMap a  -- ^ the symbol-to-label dictionary
+        -> Int          -- ^ the symbol to convert
+        -> Maybe a      -- ^ the resulting label, maybe
 toLabel dict sym = IM.lookup sym dict
 
---unsafeToLabel :: Ord a => IM.IntMap a -> Int -> a
---unsafeToLabel dict = fromJust . (toLabel dict)
+-- | Like 'toLabel', but assume the label is in the dictionary.
+unsafeToLabel :: Ord a => IM.IntMap a -> Int -> a
+unsafeToLabel dict = fromJust . (toLabel dict)
 
---sentenceToSym :: Ord a => M.Map a Int -> [a] -> [Int]
---sentenceToSym dict sentence = concatMap (maybeToList . (toSym dict)) sentence
+-- | Convert a list of labels (a sentence) to a list of symbols. Labels that
+--   do not belong to the grammar alphabet are silently expunged.
+sentenceToSym :: Ord a => M.Map a Int -> [a] -> [Int]
+sentenceToSym dict sentence = concatMap (maybeToList . (toSym dict)) sentence
 
---sentencesToSym :: Ord a => M.Map a Int -> [[a]] -> [[Int]]
---sentencesToSym dict sentences = map (sentenceToSym dict) sentences
+-- | Convert a list of label sentences to a list of symbol sentences.
+sentencesToSym :: Ord a => M.Map a Int -> [[a]] -> [[Int]]
+sentencesToSym dict sentences = map (sentenceToSym dict) sentences
 
+-- | Convert a list of symbols (a sentence) to a list of labels. Symbols that
+--   do not belong to the grammar alphabet are silently expunged.
 sentenceToLabel :: IM.IntMap a -> [Int] -> [a]
 sentenceToLabel dict sentence = concatMap (maybeToList . (toLabel dict)) sentence
 
+-- | Convert a list of symbol sentences to a list of label sentences.
 sentencesToLabel :: IM.IntMap a -> [[Int]] -> [[a]]
 sentencesToLabel dict sentences = map (sentenceToLabel dict) sentences
 
