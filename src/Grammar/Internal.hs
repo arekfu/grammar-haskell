@@ -7,8 +7,8 @@ Maintainer  : arekfu@gmail.com
 Stability   : experimental
 Portability : POSIX
 
-This module contains the most important datatypes of the 'Grammar' package and
-the functions that operate on them.
+This module contains the most important datatypes of the package and the
+functions that operate on them.
 -}
 
 {-# LANGUAGE TypeFamilies, FlexibleContexts #-}
@@ -75,21 +75,6 @@ class Grammar g where
     getTerminals :: g -> S.Set (Repr g)
     -- | Returns the set of all nonterminals used in the grammar
     getNonTerminals :: g -> S.Set (Repr g)
-
-{- $examplegrammar #examplegrammar#
-   We illustrate the pretty-printing functionality with the following example grammar:
-
-   > exampleKeyValue :: [(Char, [String])]
-   > exampleKeyValue = let initialChars = map (:[]) ['a'..'c']
-   >                       chars = ['a'..'c'] ++ ['0'..'3']
-   >                       expansions = map (\c -> ['I', c]) chars
-   >                    in [ ('E', ["E+E", "E*E", "(E)", "I"])
-   >                       , ('I', initialChars ++ expansions)
-   >                       ]
-   >
-   > exampleGrammar :: CharCFG
-   > exampleGrammar = productionsToCharCFG exampleKeyValue
--}
 
 
 -- | Pretty-print a sentence (a sequence of symbols).
@@ -159,7 +144,10 @@ reasons, the 'CFG' datatype is built upon an 'IntCFG'.
 
 data IntCFG = IntCFG Symbol (IM.IntMap [Sentence]) deriving (Eq, Ord)
 
+-- | Type synonim for 'Int'.
 type Symbol = Int
+
+-- | Type synonim for a list of 'Int's.
 type Sentence = [Int]
 
 productionsInt :: IntCFG -> Symbol -> [Sentence]

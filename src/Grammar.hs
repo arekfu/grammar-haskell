@@ -35,3 +35,18 @@ module Grammar
 
 -- local imports
 import Grammar.Internal
+
+{- $examplegrammar #examplegrammar#
+   We illustrate the pretty-printing functionality with the following example grammar:
+
+   > exampleKeyValue :: [(Char, [String])]
+   > exampleKeyValue = let initialChars = map (:[]) ['a'..'c']
+   >                       chars = ['a'..'c'] ++ ['0'..'3']
+   >                       expansions = map (\c -> ['I', c]) chars
+   >                    in [ ('E', ["E+E", "E*E", "(E)", "I"])
+   >                       , ('I', initialChars ++ expansions)
+   >                       ]
+   >
+   > exampleGrammar :: CharCFG
+   > exampleGrammar = productionsToCharCFG exampleKeyValue
+-}
