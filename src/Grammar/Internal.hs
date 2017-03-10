@@ -205,9 +205,7 @@ invert = VU.ifoldr' (\i sym inverse -> IM.insert sym i inverse) IM.empty
 
 -- | Apply the renumbering to a given 'Symbol'.
 renumberSym :: Renumbering -> Symbol -> Symbol
-renumberSym renumb sym = case renumb VU.!? sym of
-                            Just n -> n
-                            Nothing -> error ("Out of bounds: " ++ show sym ++ "/" ++ show (VU.length renumb))
+renumberSym renumb sym = renumb VU.! sym
 
 -- | Apply the renumbering to a given 'Sentence'
 renumberSentence :: Renumbering -> Sentence -> Sentence
