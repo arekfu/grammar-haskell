@@ -153,56 +153,53 @@ The IntCFG datatype implements a context-free grammar as a set of production
 rules between strings of integers. The datatype requires the integers appearing
 in the grammar to be consecutive, starting at @0@. This invariant is enforced
 on construction (see 'productionsToIntCFG'). The production rules are
-internally represented as an 'Data.IntMap.IntMap [Int]'. For efficiency
+internally represented as an 'Data.IntMap.IntMap [[Int]]'. For efficiency
 reasons, the 'CFG' datatype is built upon an 'IntCFG'.
 -}
 
-data IntCFG = IntCFG Int (IM.IntMap [[Int]]) deriving (Eq, Ord)
+data IntCFG = IntCFG Symbol (IM.IntMap [Sentence]) deriving (Eq, Ord)
 
-productionsInt :: IntCFG -> Int -> [[Int]]
+type Symbol = Int
+type Sentence = [Int]
+
+productionsInt :: IntCFG -> Symbol -> [Sentence]
 productionsInt (IntCFG _ prods) nt = let inMap = IM.lookup nt prods
                                       in concat $ maybeToList inMap
 
-isInIntCFG :: Int -> IntCFG -> Bool
+isInIntCFG :: Symbol -> IntCFG -> Bool
 isInIntCFG c (IntCFG n _) = c < n
 
-isNotInIntCFG :: Int -> IntCFG -> Bool
+isNotInIntCFG :: Symbol -> IntCFG -> Bool
 isNotInIntCFG c (IntCFG n _) = c >= n
 
-getSymbolsInt :: IntCFG -> S.Set Int
+getSymbolsInt :: IntCFG -> S.Set Symbol
 getSymbolsInt (IntCFG n _) = S.fromDistinctAscList [0..n-1]
 
-getTerminalsInt :: IntCFG -> S.Set Int
+getTerminalsInt :: IntCFG -> S.Set Symbol
 getTerminalsInt gr = (getSymbolsInt gr) `S.difference` (getNonTerminalsInt gr)
 
-getNonTerminalsInt :: IntCFG -> S.Set Int
+getNonTerminalsInt :: IntCFG -> S.Set Symbol
 getNonTerminalsInt (IntCFG _ prods) = S.fromList $ IM.keys prods
 
 -- | Helper function.
-insertInIntMap :: a -> (Int, IM.IntMap a) -> (Int, IM.IntMap a)
-insertInIntMap c (n, labels) = (n+1, IM.insert n c labels)
+insertInIntMap :: a -> (Symbol, IM.IntMap a) -> (Symbol, IM.IntMap a)
+insertInIntMap c (n, syms) = (n+1, IM.insert n c syms)
 
 -- | Helper function. Inverts keys and values.
-invertIntMap :: IM.IntMap Int -> IM.IntMap Int
-invertIntMap = IM.foldrWithKey' (\ key val inverse -> IM.insert val key inverse) IM.empty
-
--- | Helper function. Inverts keys and values.
-invertMap :: Ord a => IM.IntMap a -> M.Map a Int
+invertMap :: Ord a => IM.IntMap a -> M.Map a Symbol
 invertMap = IM.foldrWithKey' (\ key val inverse -> M.insert val key inverse) M.empty
 
 -- | Build an 'IntCFG' from an association list of @(nonterminal, productions)@ pairs.
-productionsToIntCFG :: [(Int, [[Int]])] -> (IntCFG, IM.IntMap Int, IM.IntMap Int)
+productionsToIntCFG :: [(Symbol, [Sentence])] -> IntCFG
 productionsToIntCFG kvs = let (keys, values) = unzip kvs
-                              uniqueKeys = S.fromList keys
-                              uniqueValues = foldr' S.insert uniqueKeys $ concat $ concat values
-                              uniqueLabels = uniqueKeys `S.union` uniqueValues
-                              (maxSym, symsToLabels) = S.foldr' insertInIntMap (0, IM.empty) uniqueLabels
-                              labelsToSyms = invertIntMap symsToLabels
+                              maxKey = maximum keys
+                              maxValue = maximum $ maximum $ maximum values
+                              maxSym = (max maxKey maxValue) + 1
                               prods = IM.fromList kvs
-                           in ((IntCFG maxSym prods), symsToLabels, labelsToSyms)
+                           in IntCFG maxSym prods
 
 instance Grammar IntCFG where
-    type Repr IntCFG = Int
+    type Repr IntCFG = Symbol
     productions = productionsInt
     showSymbol _ = show
     isInGrammar = isInIntCFG
@@ -225,49 +222,49 @@ enforced at the level of the datatype.
 Conversion in the opposite direction (from __symbols__ to __labels__) are
 represented by a 'Data.IntMap.IntMap'.
 -}
-data CFG a = CFG IntCFG (M.Map a Int) (IM.IntMap a)
+data CFG a = CFG IntCFG (M.Map a Symbol) (IM.IntMap a)
              deriving (Eq, Ord)
 
 -- | Convert a label to a symbol, given a dictionary.
 toSym :: Ord a
-      => M.Map a Int    -- ^ the label-to-symbol dictionary
+      => M.Map a Symbol -- ^ the label-to-symbol dictionary
       -> a              -- ^ the label to convert
-      -> Maybe Int      -- ^ the resulting symbol, maybe
+      -> Maybe Symbol    -- ^ the resulting symbol, maybe
 toSym dict label = M.lookup label dict
 
 -- | Like 'toSym', but assume the label is in the dictionary.
-unsafeToSym :: Ord a => M.Map a Int -> a -> Int
+unsafeToSym :: Ord a => M.Map a Symbol -> a -> Symbol
 unsafeToSym dict = fromJust . (toSym dict)
 
 -- | Convert a label to a symbol, given a dictionary.
 toLabel :: IM.IntMap a  -- ^ the symbol-to-label dictionary
-        -> Int          -- ^ the symbol to convert
+        -> Symbol       -- ^ the symbol to convert
         -> Maybe a      -- ^ the resulting label, maybe
 toLabel dict sym = IM.lookup sym dict
 
 -- | Like 'toLabel', but assume the label is in the dictionary.
-unsafeToLabel :: Ord a => IM.IntMap a -> Int -> a
+unsafeToLabel :: Ord a => IM.IntMap a -> Symbol -> a
 unsafeToLabel dict = fromJust . (toLabel dict)
 
 -- | Convert a list of labels (a sentence) to a list of symbols. Labels that
 --   do not belong to the grammar alphabet are silently expunged.
-sentenceToSym :: Ord a => M.Map a Int -> [a] -> [Int]
+sentenceToSym :: Ord a => M.Map a Symbol -> [a] -> Sentence
 sentenceToSym dict sentence = concatMap (maybeToList . (toSym dict)) sentence
 
 -- | Convert a list of label sentences to a list of symbol sentences.
-sentencesToSym :: Ord a => M.Map a Int -> [[a]] -> [[Int]]
+sentencesToSym :: Ord a => M.Map a Symbol -> [[a]] -> [Sentence]
 sentencesToSym dict sentences = map (sentenceToSym dict) sentences
 
 -- | Convert a list of symbols (a sentence) to a list of labels. Symbols that
 --   do not belong to the grammar alphabet are silently expunged.
-sentenceToLabel :: IM.IntMap a -> [Int] -> [a]
+sentenceToLabel :: IM.IntMap a -> Sentence -> [a]
 sentenceToLabel dict sentence = concatMap (maybeToList . (toLabel dict)) sentence
 
 -- | Convert a list of symbol sentences to a list of label sentences.
-sentencesToLabel :: IM.IntMap a -> [[Int]] -> [[a]]
+sentencesToLabel :: IM.IntMap a -> [Sentence] -> [[a]]
 sentencesToLabel dict sentences = map (sentenceToLabel dict) sentences
 
-prodsToIntProds :: Ord a => M.Map a Int -> [(a, [[a]])] -> [(Int, [[Int]])]
+prodsToIntProds :: Ord a => M.Map a Symbol -> [(a, [[a]])] -> [(Symbol, [Sentence])]
 prodsToIntProds dict ((k,vals):prods) = let k' = fromJust $ M.lookup k dict
                                             vals' = map (map (unsafeToSym dict)) vals
                                          in (k', vals'):prodsToIntProds dict prods
