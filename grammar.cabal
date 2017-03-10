@@ -18,7 +18,7 @@ library
   exposed-modules:     Grammar
                      , Grammar.Random
                      , Grammar.ParseTree
-  other-modules:       Grammar.Internal
+                     , Grammar.Internal
   build-depends:       base >= 4.7 && < 5
                      , containers
                      , random
