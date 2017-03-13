@@ -66,10 +66,12 @@ instance Arbitrary AIntCFG where
                    let (grammar, _, _) = productionsToIntCFG kvs
                    return $ AIntCFG grammar
 
-prop_maxLabel :: AIntCFG -> Property
-prop_maxLabel (AIntCFG (IntCFG maxLabel intMap)) =
+prop_checkLabels :: AIntCFG -> Property
+prop_checkLabels (AIntCFG (IntCFG maxLabel intMap)) =
     let _labels = collectLabels intMap
-     in all (<= maxLabel) (IS.toList _labels) .&&. IS.findMax _labels === maxLabel
+     in IS.findMin _labels === 0
+        .&&. IS.findMax _labels === maxLabel
+        .&&. IS.size _labels === maxLabel + 1
 
 newtype Terminal = Terminal { terminalAsChar :: Char } deriving (Eq, Ord)
 instance Show Terminal where show (Terminal c) = [c]
