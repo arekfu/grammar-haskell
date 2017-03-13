@@ -18,35 +18,35 @@ import Grammar.Internal
 ------------------------------------------------------------------------------------
 
 -- | All the map keys (nonterminals) and all the element of the sententials
---   must be found as symbols.
-prop_collectSymbolsInclusion :: IM.IntMap [Sentence] -> Property
-prop_collectSymbolsInclusion intMap =
-    let syms = collectSymbols intMap
+--   must be found as labels.
+prop_collectLabelsInclusion :: IM.IntMap [Sentence] -> Property
+prop_collectLabelsInclusion intMap =
+    let _labels = collectLabels intMap
         keys = IM.keysSet intMap
         values = concat $ concat $ IM.elems intMap
-     in keys `IS.isSubsetOf` syms .&&. all (`IS.member` syms) values
+     in keys `IS.isSubsetOf` _labels .&&. all (`IS.member` _labels) values
 
 -- | The renumbering must conserve the number of rules and the number of
---   symbols.
+--   labels.
 prop_renumber :: IM.IntMap [Sentence] -> Property
 prop_renumber intMap = let (intMap', renumbering, inverseRenumbering) = renumberMap intMap
                            nRules = IM.size intMap
-                           nSyms = IS.size $ collectSymbols intMap
-                        in nRules === IM.size intMap' .&&. nSyms === VU.length renumbering .&&. nSyms === IM.size inverseRenumbering
+                           nLabels = IS.size $ collectLabels intMap
+                        in nRules === IM.size intMap' .&&. nLabels === VU.length renumbering .&&. nLabels === IM.size inverseRenumbering
 
 -----------------------------------------
 --  now some properties about IntCFGs  --
 -----------------------------------------
 
-symMin :: Int
-symMin = -10
+labelMin :: Int
+labelMin = -10
 
-symMax :: Int
-symMax = 10
+labelMax :: Int
+labelMax = 10
 
-newtype ASymbol = ASymbol Symbol deriving (Eq, Ord, Show)
-instance Arbitrary ASymbol where
-    arbitrary = ASymbol <$> elements [symMin..symMax]
+newtype ALabel = ALabel Label deriving (Eq, Ord, Show)
+instance Arbitrary ALabel where
+    arbitrary = ALabel <$> elements [labelMin..labelMax]
 
 maxSentenceLength :: Int
 maxSentenceLength = 4
@@ -56,20 +56,20 @@ instance Arbitrary ASentence where
     arbitrary = do len <- elements [1..maxSentenceLength]
                    ASentence <$> vectorOf len arbitrary
 
-unwrap :: (ASymbol, [ASentence]) -> (Symbol, [Sentence])
-unwrap (ASymbol sym, sents) = (sym, map (\(ASentence sent) -> sent) sents)
+unwrap :: (ALabel, [ASentence]) -> (Label, [Sentence])
+unwrap (ALabel _label, sents) = (_label, map (\(ASentence sent) -> sent) sents)
 
 newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
 instance Arbitrary AIntCFG where
-    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ASymbol, [ASentence])]
+    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, [ASentence])]
                    let kvs = map unwrap akvs
                    let (grammar, _, _) = productionsToIntCFG kvs
                    return $ AIntCFG grammar
 
-prop_maxSym :: AIntCFG -> Property
-prop_maxSym (AIntCFG (IntCFG maxSym intMap)) =
-    let syms = collectSymbols intMap
-     in all (<= maxSym) (IS.toList syms) .&&. IS.findMax syms === maxSym
+prop_maxLabel :: AIntCFG -> Property
+prop_maxLabel (AIntCFG (IntCFG maxLabel intMap)) =
+    let _labels = collectLabels intMap
+     in all (<= maxLabel) (IS.toList _labels) .&&. IS.findMax _labels === maxLabel
 
 newtype Terminal = Terminal { terminalAsChar :: Char } deriving (Eq, Ord)
 instance Show Terminal where show (Terminal c) = [c]
@@ -89,10 +89,10 @@ instance Arbitrary ACharCFG where
                    wNonTerminals <- vectorOf nonTerminalsSize arbitrary :: Gen [NonTerminal]
                    let terminals = map terminalAsChar wTerminals
                    let nonTerminals = map nonTerminalAsChar wNonTerminals
-                   let allSyms = terminals ++ nonTerminals
+                   let allLabels = terminals ++ nonTerminals
                    Positive grammarSize <- arbitrary :: Gen (Positive Int)
                    keys <- vectorOf grammarSize $ elements nonTerminals
-                   values <- vectorOf grammarSize $ listOf $ listOf1 (elements allSyms)
+                   values <- vectorOf grammarSize $ listOf $ listOf1 (elements allLabels)
                    return $ ACharCFG $ productionsToCharCFG $ zip keys values
 
 
