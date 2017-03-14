@@ -9,6 +9,7 @@ import Test.QuickCheck
 import qualified Data.IntMap as IM
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.IntSet as IS
+import qualified Data.Set as S
 
 -- local imports
 import Grammar.Internal
@@ -73,6 +74,11 @@ prop_checkLabels (AIntCFG (IntCFG maxLabel intMap)) =
         .&&. IS.findMax _labels === maxLabel
         .&&. IS.size _labels === maxLabel + 1
 
+
+---------------------------------
+--  properties about real CFG  --
+---------------------------------
+
 newtype Terminal = Terminal { terminalAsChar :: Char } deriving (Eq, Ord)
 instance Show Terminal where show (Terminal c) = [c]
 instance Arbitrary Terminal where
@@ -98,8 +104,8 @@ instance Arbitrary ACharCFG where
                    return $ ACharCFG $ productionsToCharCFG $ zip keys values
 
 
---prop_terminalsDisjointNonterminals :: ACharCFG -> Bool
---prop_terminalsDisjointNonterminals (ACharCFG g) = null $ getTerminals g `S.intersection` getNonTerminals g
+prop_terminalsDisjointNonterminals :: ACharCFG -> Bool
+prop_terminalsDisjointNonterminals (ACharCFG g) = null $ getTerminals g `S.intersection` getNonTerminals g
 
 
 return []
