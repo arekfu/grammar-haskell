@@ -104,7 +104,7 @@ instance Arbitrary ACharCFG where
                    let allLabels = terminals ++ nonTerminals
                    Positive grammarSize <- arbitrary :: Gen (Positive Int)
                    keys <- vectorOf grammarSize $ elements nonTerminals
-                   values <- vectorOf grammarSize $ listOf $ listOf1 (elements allLabels)
+                   values <- vectorOf grammarSize $ listOf1 $ listOf (elements allLabels)
                    return $ ACharCFG $ productionsToCharCFG start $ zip keys values
 
 
@@ -113,6 +113,9 @@ prop_terminalsDisjointNonterminals (ACharCFG g) = null $ getTerminals g `S.inter
 
 prop_terminalsHaveNoProductions :: ACharCFG -> Bool
 prop_terminalsHaveNoProductions (ACharCFG g) = all (null . productions g) $ getTerminals g
+
+prop_nonTerminalsHaveProductions :: ACharCFG -> Bool
+prop_nonTerminalsHaveProductions (ACharCFG g) = all (not . null . productions g) $ getNonTerminals g
 
 
 return []
