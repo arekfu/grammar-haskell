@@ -111,6 +111,9 @@ instance Arbitrary ACharCFG where
 prop_terminalsDisjointNonterminals :: ACharCFG -> Bool
 prop_terminalsDisjointNonterminals (ACharCFG g) = null $ getTerminals g `S.intersection` getNonTerminals g
 
+prop_terminalsHaveNoProductions :: ACharCFG -> Bool
+prop_terminalsHaveNoProductions (ACharCFG g) = all (null . productions g) $ getTerminals g
+
 
 return []
 runTests :: IO Bool
