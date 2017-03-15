@@ -22,7 +22,10 @@ module Grammar.Internal
 -- $examplegrammar
 , showSentence
 , showProductions
+, showProductionsBNF
+, showGrammarWith
 , showGrammar
+, showGrammarBNF
 -- * Context-free grammars over alphabets of integers
 , IntCFG(..)
 -- ** Type synonims
@@ -30,7 +33,7 @@ module Grammar.Internal
 , Sentence
 , Renumbering
 , InverseRenumbering
--- ** Manipulation functions
+-- ** Manipulators
 , productionsToIntMap
 , intMapToIntCFG
 , productionsToIntCFG
@@ -64,7 +67,7 @@ import qualified Data.IntMap.Strict as IM
 import qualified Data.Set as S
 import qualified Data.IntSet as IS
 import Data.Maybe (maybeToList, mapMaybe, fromJust)
-import Data.Foldable (foldr')
+import Data.Foldable (foldr', foldr1)
 import qualified Data.Vector.Unboxed as VU
 
 {- |
@@ -95,14 +98,14 @@ class Grammar g where
     startSymbol :: g -> Repr g
 
 
--- | Pretty-print a sentence (a sequence of labels).
+-- | Pretty-print a sentence (a sequence of symbols).
 showSentence :: Grammar g
              => g           -- ^ the grammar
              -> [Repr g]    -- ^ the sentence
              -> String      -- ^ the sentence, pretty-printed as a String
 showSentence grammar = concatMap (showLabel grammar)
 
-{- | Pretty-print all the production rules associated with a synbol.
+{- | Pretty-print all the production rules associated with a symbol.
 
    >>> putStrLn $ showProductions exampleGrammar 'E'
    E -> E+E
@@ -117,6 +120,52 @@ showProductions :: Grammar g
 showProductions grammar label = let header = showLabel grammar label
                                     ls = productions grammar label
                                  in concatMap (\l -> header ++ " -> " ++ showSentence grammar l ++ "\n") ls
+
+{- | Pretty-print all the production rules associated with a symbol, in
+     Backus-Naur form.
+
+   >>> putStrLn $ showProductionsBNF exampleGrammar 'E'
+   E := E+E | E*E | (E) | I
+-}
+showProductionsBNF :: Grammar g
+                   => g            -- ^ the grammar
+                   -> Repr g       -- ^ the label on the left-hand side of the rule
+                   -> String       -- ^ the pretty-printed production rule
+showProductionsBNF grammar label = let header = showLabel grammar label
+                                       ls = productions grammar label
+                                    in header ++ " := " ++ joinProductionsBNF grammar ls ++ "\n"
+
+
+-- | Helper function to concatenate production rules in BNF form.
+joinProductionsBNF :: Grammar g => g -> [[Repr g]] -> String
+joinProductionsBNF _ [] = ""
+joinProductionsBNF grammar ps = foldr1 (\rule rest -> rule ++ " | " ++ rest) $ map (showSentence grammar) ps
+
+{- | Pretty-print all the production rules in a grammar.
+
+   >>> putStrLn $ showGrammar exampleGrammar
+   E -> E+E
+   E -> E*E
+   E -> (E)
+   E -> I
+   I -> a
+   I -> b
+   I -> c
+   I -> Ia
+   I -> Ib
+   I -> Ic
+   I -> I0
+   I -> I1
+   I -> I2
+   I -> I3
+-}
+showGrammarWith :: Grammar g
+                => (g -> Repr g -> String)  -- ^ a function that shows a sentence
+                -> g                        -- ^ the grammar
+                -> String                   -- ^ its pretty-printed representation as a String
+showGrammarWith showProds grammar = let labels = S.toList $ getNonTerminals grammar
+                                     in concatMap (showProds grammar) labels
+
 
 {- | Pretty-print all the production rules in a grammar.
 
@@ -137,10 +186,29 @@ showProductions grammar label = let header = showLabel grammar label
    I -> I3
 -}
 showGrammar :: Grammar g
-            => g        -- ^ the grammar
-            -> String   -- ^ its pretty-printed representation as a String
-showGrammar grammar = let labels = S.toList $ getLabels grammar
-                       in concatMap (showProductions grammar) labels
+            => g                        -- ^ the grammar
+            -> String                   -- ^ its pretty-printed representation as a String
+showGrammar = showGrammarWith showProductions
+
+
+{- | Pretty-print all the production rules in a grammar, in Backus-Naur form.
+
+   >>> putStrLn $ showGrammarBNF exampleGrammar
+   E := E+E | E*E | (E) | I
+   I := a | b | c | Ia | Ib | Ic | I0 | I1 | I2 | I3
+-}
+showGrammarBNF :: Grammar g
+               => g                        -- ^ the grammar
+               -> String                   -- ^ its pretty-printed representation as a String
+showGrammarBNF = showGrammarWith showProductionsBNF
+
+
+
+
+------------------------------------
+--  generic grammar manipulators  --
+------------------------------------
+
 
 -- | Pick the @n@-th production rule associated with a given label. WARNING:
 --   unsafe if @n@ is out of bounds.
@@ -150,6 +218,12 @@ pick :: Grammar g
      -> Repr g      -- ^ the nonterminal label
      -> [Repr g]    -- ^ the associated production rule
 pick n grammar label = productions grammar label !! n
+
+
+
+---------------------------------------
+--  Int-based grammar type (IntCFG)  --
+---------------------------------------
 
 {- |
 The IntCFG datatype implements a context-free grammar as a set of production
@@ -283,7 +357,7 @@ instance Grammar IntCFG where
     getNonTerminals = getNonTerminalsInt
     startSymbol _ = 0
 
-instance Show IntCFG where show = showGrammar
+instance Show IntCFG where show = showGrammarBNF
 
 
 {- | A datatype representing context-free grammars over alphabets of arbitrary
@@ -416,7 +490,7 @@ instance (Ord a, Show a) => Grammar (CFG a) where
     getNonTerminals = getNonTerminalsCFG
     startSymbol = startSymbolCFG
 
-instance (Ord a, Show a) => Show (CFG a) where show = showGrammar
+instance (Ord a, Show a) => Show (CFG a) where show = showGrammarBNF
 
 
 {- | A newtype for 'Char'-based context-free grammars. This is solely done to
@@ -445,7 +519,7 @@ instance Grammar CharCFG where
 productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
 productionsToCharCFG start = CharCFG . productionsToCFG start
 
-instance Show CharCFG where show = showGrammar
+instance Show CharCFG where show = showGrammarBNF
 
 {- | A newtype for 'String'-based context-free grammars. This is solely done to
      improve the pretty-printing representation of the grammar labels.
@@ -473,4 +547,4 @@ instance Grammar StringCFG where
 productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG
 productionsToStringCFG start = StringCFG . productionsToCFG start
 
-instance Show StringCFG where show = showGrammar
+instance Show StringCFG where show = showGrammarBNF
