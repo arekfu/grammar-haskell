@@ -12,7 +12,7 @@ exampleKeyValue = let initialChars = map (:[]) ['a'..'c']
                       ]
 
 exampleGrammar :: CharCFG
-exampleGrammar = productionsToCharCFG exampleKeyValue
+exampleGrammar = productionsToCharCFG 'E' exampleKeyValue
 
 main :: IO ()
 main = do print exampleGrammar

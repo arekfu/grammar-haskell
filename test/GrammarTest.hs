@@ -29,11 +29,15 @@ prop_collectLabelsInclusion intMap =
 
 -- | The renumbering must conserve the number of rules and the number of
 --   labels.
-prop_renumber :: IM.IntMap [Sentence] -> Property
-prop_renumber intMap = let (intMap', renumbering, inverseRenumbering) = renumberMap intMap
-                           nRules = IM.size intMap
-                           nLabels = IS.size $ collectLabels intMap
-                        in nRules === IM.size intMap' .&&. nLabels === VU.length renumbering .&&. nLabels === IM.size inverseRenumbering
+prop_renumber :: Label -> IM.IntMap [Sentence] -> Property
+prop_renumber start intMap = start `IM.member` intMap ==>
+    let (intMap', renumbering, inverseRenumbering) = renumberMap start intMap
+        nRules = IM.size intMap
+        nLabels = IS.size $ collectLabels intMap
+     in nRules === IM.size intMap'
+           .&&. nLabels === VU.length renumbering
+           .&&. nLabels === IM.size inverseRenumbering
+           .&&. VU.head renumbering == start
 
 -----------------------------------------
 --  now some properties about IntCFGs  --
@@ -64,7 +68,8 @@ newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
 instance Arbitrary AIntCFG where
     arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, [ASentence])]
                    let kvs = map unwrap akvs
-                   let (grammar, _, _) = productionsToIntCFG kvs
+                   let start = fst $ head kvs
+                   let (grammar, _, _) = productionsToIntCFG start kvs
                    return $ AIntCFG grammar
 
 prop_checkLabels :: AIntCFG -> Property
@@ -97,11 +102,12 @@ instance Arbitrary ACharCFG where
                    wNonTerminals <- vectorOf nonTerminalsSize arbitrary :: Gen [NonTerminal]
                    let terminals = map terminalAsChar wTerminals
                    let nonTerminals = map nonTerminalAsChar wNonTerminals
+                   let start = head nonTerminals
                    let allLabels = terminals ++ nonTerminals
                    Positive grammarSize <- arbitrary :: Gen (Positive Int)
                    keys <- vectorOf grammarSize $ elements nonTerminals
                    values <- vectorOf grammarSize $ listOf $ listOf1 (elements allLabels)
-                   return $ ACharCFG $ productionsToCharCFG $ zip keys values
+                   return $ ACharCFG $ productionsToCharCFG start $ zip keys values
 
 
 prop_terminalsDisjointNonterminals :: ACharCFG -> Bool

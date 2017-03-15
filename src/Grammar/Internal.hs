@@ -91,6 +91,8 @@ class Grammar g where
     getTerminals :: g -> S.Set (Repr g)
     -- | Returns the set of all nonterminals used in the grammar
     getNonTerminals :: g -> S.Set (Repr g)
+    -- | Returns the start symbol of the grammar
+    startSymbol :: g -> Repr g
 
 
 -- | Pretty-print a sentence (a sequence of labels).
@@ -152,10 +154,11 @@ pick n grammar label = productions grammar label !! n
 {- |
 The IntCFG datatype implements a context-free grammar as a set of production
 rules between strings of integers. The datatype requires the integers appearing
-in the grammar to be consecutive, starting at @0@. This invariant is enforced
-on construction (see 'productionsToIntCFG'). The production rules are
-internally represented as an 'Data.IntMap.IntMap [[Int]]'. For efficiency
-reasons, the 'CFG' datatype is built upon an 'IntCFG'.
+in the grammar to be consecutive, starting at @0@, which is taken to be the
+start symbol of the grammar. This invariant is enforced on construction (see
+'productionsToIntCFG'). The production rules are internally represented as an
+'Data.IntMap.IntMap [[Int]]'. For efficiency reasons, the 'CFG' datatype is
+built upon an 'IntCFG'.
 -}
 
 data IntCFG = IntCFG Label (IM.IntMap [Sentence]) deriving (Eq, Ord)
@@ -226,19 +229,23 @@ collectLabels =
         insertSentences set sentences = foldr' IS.insert set $ concat sentences
      in IM.foldrWithKey (\key values set -> insertSentences (IS.insert key set) values) IS.empty
 
--- | Renumber the @n@ integers that appear as keys and values of the map in
---   such a way that they exactly span the @[0,n-1]@ interval. The
---   correspondence between the new and the old numbering scheme
---   ('Renumbering') is returned as a 'Data.Vector.Unboxed.Vector'. The inverse
---   mapping is returned as an 'Data.IntMap.IntMap'.
-renumberMap :: IM.IntMap [Sentence] -- ^ The map to renumber
+{- | Renumber the @n@ integers that appear as keys and values of the map in
+     such a way that they exactly span the @[0,n-1]@ interval. The
+     correspondence between the new and the old numbering scheme
+     ('Renumbering') is returned as a 'Data.Vector.Unboxed.Vector'. The inverse
+     mapping is returned as an 'Data.IntMap.IntMap'. The starting symbol is
+     always renumbered as 0.
+-}
+renumberMap :: Label                -- ^ The label of the starting symbol
+            -> IM.IntMap [Sentence] -- ^ The map to renumber
             -> (IM.IntMap [Sentence], Renumbering, InverseRenumbering)  -- ^ The renumbered map, the new-to-old mapping and the old-to-new mapping
-renumberMap intMap = let allLabels = collectLabels intMap
-                         renumbering = VU.fromList $ IS.toList allLabels
-                         inverseRenumbering = invert renumbering
-                         intMap' = IM.mapKeys (inverseRenumberLabel inverseRenumbering) intMap
-                         intMap'' = IM.map (map (inverseRenumberSentence inverseRenumbering)) intMap'
-                      in (intMap'', renumbering, inverseRenumbering)
+renumberMap start intMap =
+    let allLabelsExceptStart = IS.delete start $ collectLabels intMap
+        renumbering = VU.fromList $ start : IS.toList allLabelsExceptStart
+        inverseRenumbering = invert renumbering
+        intMap' = IM.mapKeys (inverseRenumberLabel inverseRenumbering) intMap
+        intMap'' = IM.map (map (inverseRenumberSentence inverseRenumbering)) intMap'
+     in (intMap'', renumbering, inverseRenumbering)
 
 {- | Build an 'IntCFG' from an association list of @(nonterminal, productions)@
      pairs. The Labels appearing in the association list are renumbered to
@@ -246,17 +253,17 @@ renumberMap intMap = let allLabels = collectLabels intMap
      is returned along with the built grammar, in the form of a
      'Data.Vector.Unboxed.Vector' 'Label' indexed by the renumbered labels.
 -}
-productionsToIntCFG :: [(Label, [Sentence])] -> (IntCFG, Renumbering, InverseRenumbering)
-productionsToIntCFG = intMapToIntCFG . productionsToIntMap
+productionsToIntCFG :: Label -> [(Label, [Sentence])] -> (IntCFG, Renumbering, InverseRenumbering)
+productionsToIntCFG start = intMapToIntCFG start . productionsToIntMap
 
 {- | Build an 'IntCFG' from an 'Data.IntMap.IntMap' between 'Label's. The
      'Labels' will be renumbered as specified in the second and third return
      values.
 -}
-intMapToIntCFG :: IM.IntMap [Sentence] -> (IntCFG, Renumbering, InverseRenumbering)
-intMapToIntCFG intMap = let (intMap', renumbering, inverseRenumbering) = renumberMap intMap
-                            maxLabel = VU.length renumbering - 1
-                         in (IntCFG maxLabel intMap', renumbering, inverseRenumbering)
+intMapToIntCFG :: Label -> IM.IntMap [Sentence] -> (IntCFG, Renumbering, InverseRenumbering)
+intMapToIntCFG start intMap = let (intMap', renumbering, inverseRenumbering) = renumberMap start intMap
+                                  maxLabel = VU.length renumbering - 1
+                               in (IntCFG maxLabel intMap', renumbering, inverseRenumbering)
 
 {- | Provide the fundamental building block to construct an 'IntCFG' from an
      association list of @(nonterminal, productions)@ pairs. The Labels are
@@ -274,6 +281,7 @@ instance Grammar IntCFG where
     getLabels = getLabelsInt
     getTerminals = getTerminalsInt
     getNonTerminals = getNonTerminalsInt
+    startSymbol _ = 0
 
 instance Show IntCFG where show = showGrammar
 
@@ -291,7 +299,7 @@ enforced at the level of the datatype.
 Conversion in the opposite direction (from __labels__ to __symbols__) are
 represented by a 'Data.IntMap.IntMap'.
 -}
-data CFG a = CFG IntCFG (M.Map a Label) (IM.IntMap a)
+data CFG a = CFG a IntCFG (M.Map a Label) (IM.IntMap a)
              deriving (Eq, Ord)
 
 -- | Convert a symbol to a label, given a dictionary.
@@ -353,45 +361,49 @@ prodsToIntProds _ [] = []
    > exampleGrammar :: CharCFG
    > exampleGrammar = productionsToCharCFG exampleKeyValue
 -}
-productionsToCFG :: Ord a => [(a, [[a]])] -> CFG a
-productionsToCFG kvs = let (keys, values) = unzip kvs
-                           uniqueKeys = S.fromList keys
-                           uniqueValues = foldr' S.insert uniqueKeys $ concat $ concat values
-                           uniqueSymbols = uniqueKeys `S.union` uniqueValues
-                           (nextLabel, labelsToSymbols) = S.foldr' insertInIntMap (0, IM.empty) uniqueSymbols
-                           maxLabel = nextLabel - 1
-                           symbolsToLabels = invertMap labelsToSymbols
-                           prods = IM.fromList $ prodsToIntProds symbolsToLabels kvs
-                        in CFG (IntCFG maxLabel prods) symbolsToLabels labelsToSymbols
+productionsToCFG :: Ord a => a -> [(a, [[a]])] -> CFG a
+productionsToCFG start kvs =
+    let (keys, values) = unzip kvs
+        uniqueKeys = S.fromList keys
+        uniqueValues = foldr' S.insert uniqueKeys $ concat $ concat values
+        uniqueSymbols = uniqueKeys `S.union` uniqueValues
+        (nextLabel, labelsToSymbols) = S.foldr' insertInIntMap (0, IM.empty) uniqueSymbols
+        maxLabel = nextLabel - 1
+        symbolsToLabels = invertMap labelsToSymbols
+        prods = IM.fromList $ prodsToIntProds symbolsToLabels kvs
+     in CFG start (IntCFG maxLabel prods) symbolsToLabels labelsToSymbols
 
 productionsCFG :: Ord a => CFG a -> a -> [[a]]
-productionsCFG (CFG iGr s2l l2s) symbol =
+productionsCFG (CFG _ iGr s2l l2s) symbol =
     case toLabel s2l symbol of
         Nothing  -> []
         Just label -> let prodsInt = productionsInt iGr label
                        in sentencesToSymbol l2s prodsInt
 
 isInCFG :: Ord a => a -> CFG a -> Bool
-isInCFG c (CFG iGr s2l _) = case toLabel s2l c of
+isInCFG c (CFG _ iGr s2l _) = case toLabel s2l c of
                                 Nothing -> False
                                 Just i  -> isInIntCFG i iGr
 
 isNotInCFG :: Ord a => a -> CFG a -> Bool
-isNotInCFG c (CFG iGr s2l _) = case toLabel s2l c of
+isNotInCFG c (CFG _ iGr s2l _) = case toLabel s2l c of
                                    Nothing -> False
                                    Just i  -> isNotInIntCFG i iGr
 
 getLabelsCFG :: Ord a => CFG a -> S.Set a
-getLabelsCFG (CFG iGr _ l2s) = let labels = getLabelsInt iGr
+getLabelsCFG (CFG _ iGr _ l2s) = let labels = getLabelsInt iGr
                                  in S.map (fromJust . toSymbol l2s) labels
 
 getTerminalsCFG :: Ord a => CFG a -> S.Set a
-getTerminalsCFG (CFG iGr _ l2s) = let labels = getTerminalsInt iGr
+getTerminalsCFG (CFG _ iGr _ l2s) = let labels = getTerminalsInt iGr
                                    in S.map (fromJust . toSymbol l2s) labels
 
 getNonTerminalsCFG :: Ord a => CFG a -> S.Set a
-getNonTerminalsCFG (CFG iGr _ l2s) = let labels = getNonTerminalsInt iGr
+getNonTerminalsCFG (CFG _ iGr _ l2s) = let labels = getNonTerminalsInt iGr
                                       in S.map (fromJust . toSymbol l2s) labels
+
+startSymbolCFG :: CFG a -> a
+startSymbolCFG (CFG start _ _ _) = start
 
 instance (Ord a, Show a) => Grammar (CFG a) where
     type Repr (CFG a) = a
@@ -402,6 +414,7 @@ instance (Ord a, Show a) => Grammar (CFG a) where
     getLabels = getLabelsCFG
     getTerminals = getTerminalsCFG
     getNonTerminals = getNonTerminalsCFG
+    startSymbol = startSymbolCFG
 
 instance (Ord a, Show a) => Show (CFG a) where show = showGrammar
 
@@ -426,10 +439,11 @@ instance Grammar CharCFG where
     getLabels (CharCFG g) = getLabelsCFG g
     getTerminals (CharCFG g) = getTerminalsCFG g
     getNonTerminals (CharCFG g) = getNonTerminalsCFG g
+    startSymbol (CharCFG g) = startSymbol g
 
 -- | Build a 'CharCFG' from an association list of production rules -- see 'productionsToCFG'.
-productionsToCharCFG :: [(Char, [String])] -> CharCFG
-productionsToCharCFG = CharCFG . productionsToCFG
+productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
+productionsToCharCFG start = CharCFG . productionsToCFG start
 
 instance Show CharCFG where show = showGrammar
 
@@ -453,9 +467,10 @@ instance Grammar StringCFG where
     getLabels (StringCFG g) = getLabelsCFG g
     getTerminals (StringCFG g) = getTerminalsCFG g
     getNonTerminals (StringCFG g) = getNonTerminalsCFG g
+    startSymbol (StringCFG g) = startSymbol g
 
 -- | Build a 'StringCFG' from an association list of production rules -- see 'productionsToCFG'.
-productionsToStringCFG :: [(String, [[String]])] -> StringCFG
-productionsToStringCFG = StringCFG . productionsToCFG
+productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG
+productionsToStringCFG start = StringCFG . productionsToCFG start
 
 instance Show StringCFG where show = showGrammar
