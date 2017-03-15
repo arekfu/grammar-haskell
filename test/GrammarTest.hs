@@ -10,6 +10,7 @@ import qualified Data.IntMap as IM
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.IntSet as IS
 import qualified Data.Set as S
+import Data.Coerce
 
 -- local imports
 import Grammar.Internal
@@ -51,7 +52,7 @@ labelMax = 10
 
 newtype ALabel = ALabel Label deriving (Eq, Ord, Show)
 instance Arbitrary ALabel where
-    arbitrary = ALabel <$> elements [labelMin..labelMax]
+    arbitrary = coerce <$> elements [labelMin..labelMax]
 
 maxSentenceLength :: Int
 maxSentenceLength = 4
@@ -59,18 +60,15 @@ maxSentenceLength = 4
 newtype ASentence = ASentence Sentence deriving (Eq, Ord, Show)
 instance Arbitrary ASentence where
     arbitrary = do len <- elements [1..maxSentenceLength]
-                   ASentence <$> vectorOf len arbitrary
-
-unwrap :: (ALabel, [ASentence]) -> (Label, [Sentence])
-unwrap (ALabel _label, sents) = (_label, map (\(ASentence sent) -> sent) sents)
+                   coerce <$> vectorOf len (arbitrary :: Gen Label)
 
 newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
 instance Arbitrary AIntCFG where
     arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, [ASentence])]
-                   let kvs = map unwrap akvs
+                   let kvs = coerce akvs
                    let start = fst $ head kvs
                    let (grammar, _, _) = productionsToIntCFG start kvs
-                   return $ AIntCFG grammar
+                   return $ coerce grammar
 
 prop_checkLabels :: AIntCFG -> Property
 prop_checkLabels (AIntCFG (IntCFG maxLabel intMap)) =
@@ -84,12 +82,12 @@ prop_checkLabels (AIntCFG (IntCFG maxLabel intMap)) =
 --  properties about real CFG  --
 ---------------------------------
 
-newtype Terminal = Terminal { terminalAsChar :: Char } deriving (Eq, Ord)
+newtype Terminal = Terminal Char deriving (Eq, Ord)
 instance Show Terminal where show (Terminal c) = [c]
 instance Arbitrary Terminal where
     arbitrary = Terminal <$> elements (['_', '+', '*'] ++ ['a'..'z'] ++ ['0'..'9'])
 
-newtype NonTerminal = NonTerminal { nonTerminalAsChar :: Char } deriving (Eq, Ord)
+newtype NonTerminal = NonTerminal Char deriving (Eq, Ord)
 instance Show NonTerminal where show (NonTerminal c) = [c]
 instance Arbitrary NonTerminal where
     arbitrary = NonTerminal <$> elements ['A'..'Z']
@@ -100,8 +98,8 @@ instance Arbitrary ACharCFG where
                    Positive (Small nonTerminalsSize) <- arbitrary :: Gen (Positive (Small Int))
                    wTerminals <- vectorOf terminalsSize arbitrary :: Gen [Terminal]
                    wNonTerminals <- vectorOf nonTerminalsSize arbitrary :: Gen [NonTerminal]
-                   let terminals = map terminalAsChar wTerminals
-                   let nonTerminals = map nonTerminalAsChar wNonTerminals
+                   let terminals = coerce wTerminals
+                   let nonTerminals = coerce wNonTerminals
                    let start = head nonTerminals
                    let allLabels = terminals ++ nonTerminals
                    Positive grammarSize <- arbitrary :: Gen (Positive Int)
