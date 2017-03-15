@@ -16,6 +16,6 @@ exampleGrammar = productionsToCharCFG 'E' exampleKeyValue
 
 main :: IO ()
 main = do print exampleGrammar
-          let expansion = randomSentDeriveScan exampleGrammar "E"
+          let expansion = randomGrammarDeriveScan exampleGrammar
           let strings = take 20 $ evalGrammar expansion 121333
           mapM_ putStrLn strings

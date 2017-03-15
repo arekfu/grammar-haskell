@@ -31,10 +31,14 @@ module Grammar
 , productionsToCharCFG
 , StringCFG
 , productionsToStringCFG
+-- * Random grammar derivation
+, randomGrammarDerive
+, randomGrammarDeriveScan
 ) where
 
 -- local imports
 import Grammar.Internal
+import Grammar.Random
 
 {- $examplegrammar #examplegrammar#
    We illustrate the pretty-printing functionality with the following example grammar:

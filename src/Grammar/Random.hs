@@ -30,6 +30,9 @@ module Grammar.Random
 , randomSentDerive
 , randomSentDeriveN
 , randomSentDeriveScan
+, randomGrammarDerive
+, randomGrammarDeriveN
+, randomGrammarDeriveScan
 ) where
 
 -- system imports
@@ -151,3 +154,27 @@ randomSentDeriveScan grammar sent =
        if sent == expanded
        then return [expanded]
        else fmap (expanded:) (randomSentDeriveScan grammar expanded)
+
+-- | Recursively and randomly expand the start symbol of a grammar until it
+--   consists solely of terminals. WARNING: may produce infinite lists!
+randomGrammarDerive :: (Grammar g, Ord (Repr g))
+                    => g           -- ^ the grammar
+                    -> MC [Repr g] -- ^ a fully expanded sequence of terminals
+randomGrammarDerive grammar = randomSentDerive grammar [startSymbol grammar]
+
+-- | Recursively and randomly expand the start symbol of a grammar until it
+--   consists solely of terminals or until @n@ expansion steps have been
+--   performed, whichever comes first.
+randomGrammarDeriveN :: (Grammar g, Ord (Repr g))
+                     => Int            -- ^ the maximum number of expansions
+                     -> g              -- ^ the grammar
+                     -> MC [Repr g]    -- ^ the resulting expansion
+randomGrammarDeriveN n grammar = randomSentDeriveN n grammar [startSymbol grammar]
+
+-- | Recursively and randomly expand the start symbol of a grammar, and return
+--   all the intermediate expansion results. WARNING: may produce infinite
+--   lists!
+randomGrammarDeriveScan :: (Grammar g, Ord (Repr g))
+                        => g               -- ^ the grammar
+                        -> MC [[Repr g]]   -- ^ the list of all intermediate expansions
+randomGrammarDeriveScan grammar = randomSentDeriveScan grammar [startSymbol grammar]
