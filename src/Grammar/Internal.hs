@@ -89,7 +89,7 @@ class Grammar g where
     isNotInGrammar :: Repr g -> g -> Bool
     isNotInGrammar x gr = not $ isInGrammar x gr
     -- | Returns the set of all labels used in the grammar
-    getLabels :: g -> S.Set (Repr g)
+    getSymbols :: g -> S.Set (Repr g)
     -- | Returns the set of all terminals used in the grammar
     getTerminals :: g -> S.Set (Repr g)
     -- | Returns the set of all nonterminals used in the grammar
@@ -251,11 +251,11 @@ isInIntCFG c (IntCFG n _) = c < n
 isNotInIntCFG :: Label -> IntCFG -> Bool
 isNotInIntCFG c (IntCFG n _) = c >= n
 
-getLabelsInt :: IntCFG -> S.Set Label
-getLabelsInt (IntCFG n _) = S.fromDistinctAscList [0..n-1]
+getSymbolsInt :: IntCFG -> S.Set Label
+getSymbolsInt (IntCFG n _) = S.fromDistinctAscList [0..n-1]
 
 getTerminalsInt :: IntCFG -> S.Set Label
-getTerminalsInt gr = getLabelsInt gr `S.difference` getNonTerminalsInt gr
+getTerminalsInt gr = getSymbolsInt gr `S.difference` getNonTerminalsInt gr
 
 getNonTerminalsInt :: IntCFG -> S.Set Label
 getNonTerminalsInt (IntCFG _ prods) = S.fromList $ IM.keys prods
@@ -352,7 +352,7 @@ instance Grammar IntCFG where
     showLabel (ReprInt sym) = show sym
     isInGrammar (ReprInt sym) = isInIntCFG sym
     isNotInGrammar (ReprInt sym) = isNotInIntCFG sym
-    getLabels = S.map ReprInt . getLabelsInt
+    getSymbols = S.map ReprInt . getSymbolsInt
     getTerminals = S.map ReprInt . getTerminalsInt
     getNonTerminals = S.map ReprInt . getNonTerminalsInt
     startSymbol _ = ReprInt 0
@@ -464,9 +464,9 @@ isNotInCFG c (CFG _ iGr s2l _) = case toLabel s2l c of
                                    Nothing -> False
                                    Just i  -> isNotInIntCFG i iGr
 
-getLabelsCFG :: Ord a => CFG a -> S.Set a
-getLabelsCFG (CFG _ iGr _ l2s) = let labels = getLabelsInt iGr
-                                 in S.map (fromJust . toSymbol l2s) labels
+getSymbolsCFG :: Ord a => CFG a -> S.Set a
+getSymbolsCFG (CFG _ iGr _ l2s) = let labels = getSymbolsInt iGr
+                                   in S.map (fromJust . toSymbol l2s) labels
 
 getTerminalsCFG :: Ord a => CFG a -> S.Set a
 getTerminalsCFG (CFG _ iGr _ l2s) = let labels = getTerminalsInt iGr
@@ -485,7 +485,7 @@ instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     showLabel = show
     isInGrammar (ReprCFG s) = isInCFG s
     isNotInGrammar (ReprCFG s) = isNotInCFG s
-    getLabels = S.map ReprCFG . getLabelsCFG
+    getSymbols = S.map ReprCFG . getSymbolsCFG
     getTerminals = S.map ReprCFG . getTerminalsCFG
     getNonTerminals = S.map ReprCFG . getNonTerminalsCFG
     startSymbol = ReprCFG . startSymbolCFG
@@ -510,7 +510,7 @@ instance Grammar CharCFG where
     showLabel (ReprChar s) = [s]
     isInGrammar (ReprChar s) (CharCFG g)= isInCFG s g
     isNotInGrammar (ReprChar s) (CharCFG g) = isNotInCFG s g
-    getLabels (CharCFG g) = S.map ReprChar $ getLabelsCFG g
+    getSymbols (CharCFG g) = S.map ReprChar $ getSymbolsCFG g
     getTerminals (CharCFG g) = S.map ReprChar $ getTerminalsCFG g
     getNonTerminals (CharCFG g) = S.map ReprChar $ getNonTerminalsCFG g
     startSymbol (CharCFG g) = ReprChar $ startSymbolCFG g
@@ -538,7 +538,7 @@ instance Grammar StringCFG where
     showLabel (ReprString s) = s
     isInGrammar (ReprString s) (StringCFG g)= isInCFG s g
     isNotInGrammar (ReprString s) (StringCFG g) = isNotInCFG s g
-    getLabels (StringCFG g) = S.map ReprString $ getLabelsCFG g
+    getSymbols (StringCFG g) = S.map ReprString $ getSymbolsCFG g
     getTerminals (StringCFG g) = S.map ReprString $ getTerminalsCFG g
     getNonTerminals (StringCFG g) = S.map ReprString $ getNonTerminalsCFG g
     startSymbol (StringCFG g) = ReprString $ startSymbolCFG g
