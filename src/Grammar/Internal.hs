@@ -66,7 +66,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Set as S
 import qualified Data.IntSet as IS
-import Data.Maybe (maybeToList, mapMaybe, fromJust)
+import Data.Maybe (maybeToList, fromJust)
 import Data.Foldable (foldr', foldr1)
 import qualified Data.Vector.Unboxed as VU
 
@@ -239,7 +239,7 @@ data IntCFG = IntCFG Label (IM.IntMap [Sentence]) deriving (Eq, Ord)
 type Label = Int
 
 -- | Type synonim for a list of 'Int's.
-type Sentence = [Int]
+type Sentence = VU.Vector Int
 
 productionsInt :: IntCFG -> Label -> [Sentence]
 productionsInt (IntCFG _ prods) nt = let inMap = IM.lookup nt prods
@@ -284,7 +284,7 @@ renumberLabel renumb label = renumb VU.! label
 
 -- | Apply the renumbering to a given 'Sentence'
 renumberSentence :: Renumbering -> Sentence -> Sentence
-renumberSentence renumb = map (renumberLabel renumb)
+renumberSentence renumb = VU.map (renumberLabel renumb)
 
 -- | Apply the inverse renumbering to a given 'Label'
 inverseRenumberLabel :: InverseRenumbering -> Label -> Label
@@ -292,13 +292,13 @@ inverseRenumberLabel iRenumb label = fromJust $ IM.lookup label iRenumb
 
 -- | Apply the inverse renumbering to a given 'Sentence'
 inverseRenumberSentence :: InverseRenumbering -> Sentence -> Sentence
-inverseRenumberSentence iRenumb = map (inverseRenumberLabel iRenumb)
+inverseRenumberSentence iRenumb = VU.map (inverseRenumberLabel iRenumb)
 
 -- | Return all labels appearing in a set of (integer) production rules.
 collectLabels :: IM.IntMap [Sentence] -> IS.IntSet
 collectLabels =
     let insertSentences :: IS.IntSet -> [Sentence] -> IS.IntSet
-        insertSentences set sentences = foldr' IS.insert set $ concat sentences
+        insertSentences set sentences = foldr' (\sent set' -> VU.foldr' IS.insert set' sent) set sentences
      in IM.foldrWithKey (\key values set -> insertSentences (IS.insert key set) values) IS.empty
 
 {- | Renumber the @n@ integers that appear as keys and values of the map in
@@ -348,7 +348,7 @@ instance Grammar IntCFG where
     data Repr IntCFG = ReprInt Label deriving (Eq, Ord, Show)
     -- all the instance declarations do is actually wrap and unwrap the Repr
     -- datatype
-    productions g (ReprInt sym) =  map (map ReprInt) $ productionsInt g sym
+    productions g (ReprInt sym) =  map (map ReprInt . VU.toList) $ productionsInt g sym
     showLabel (ReprInt sym) = show sym
     isInGrammar (ReprInt sym) = isInIntCFG sym
     isNotInGrammar (ReprInt sym) = isNotInIntCFG sym
@@ -394,13 +394,13 @@ toSymbol :: IM.IntMap a  -- ^ the label-to-symbol dictionary
 toSymbol dict sym = IM.lookup sym dict
 
 -- | Like 'toSymbol', but assume the label is in the dictionary.
-unsafeToSymbol :: Ord a => IM.IntMap a -> Label -> a
+unsafeToSymbol :: IM.IntMap a -> Label -> a
 unsafeToSymbol dict = fromJust . toSymbol dict
 
 -- | Convert a string of symbols to a list of labels. Symbols that do not
 --   belong to the grammar alphabet are silently expunged.
 sentenceToLabel :: Ord a => M.Map a Label -> [a] -> Sentence
-sentenceToLabel dict = mapMaybe (toLabel dict)
+sentenceToLabel dict = VU.fromList . map (unsafeToLabel dict)
 
 -- | Convert a list of symbol strings to a list of label sentences.
 sentencesToLabel :: Ord a => M.Map a Label -> [[a]] -> [Sentence]
@@ -409,7 +409,7 @@ sentencesToLabel dict = map (sentenceToLabel dict)
 -- | Convert a list of labels (a sentence) to a string of symbols. Labels
 --   that do not belong to the grammar alphabet are silently expunged.
 sentenceToSymbol :: IM.IntMap a -> Sentence -> [a]
-sentenceToSymbol dict = mapMaybe (toSymbol dict)
+sentenceToSymbol dict = map (unsafeToSymbol dict) . VU.toList
 
 -- | Convert a list of label sentences to a list of symbol strings.
 sentencesToSymbol :: IM.IntMap a -> [Sentence] -> [[a]]
@@ -417,7 +417,7 @@ sentencesToSymbol dict = map (sentenceToSymbol dict)
 
 prodsToIntProds :: Ord a => M.Map a Label -> [(a, [[a]])] -> [(Label, [Sentence])]
 prodsToIntProds dict ((k,vals):prods) = let k' = fromJust $ M.lookup k dict
-                                            vals' = map (map (unsafeToLabel dict)) vals
+                                            vals' = map (VU.fromList . map (unsafeToLabel dict)) vals
                                          in (k', vals'):prodsToIntProds dict prods
 prodsToIntProds _ [] = []
 

@@ -15,33 +15,8 @@ import Data.Coerce
 -- local imports
 import Grammar.Internal
 
-------------------------------------------------------------------------------------
---  some properties to test the functions that manipulate IntMaps, IntSets, etc.  --
-------------------------------------------------------------------------------------
-
--- | All the map keys (nonterminals) and all the element of the sententials
---   must be found as labels.
-prop_collectLabelsInclusion :: IM.IntMap [Sentence] -> Property
-prop_collectLabelsInclusion intMap =
-    let _labels = collectLabels intMap
-        keys = IM.keysSet intMap
-        values = concat $ concat $ IM.elems intMap
-     in keys `IS.isSubsetOf` _labels .&&. all (`IS.member` _labels) values
-
--- | The renumbering must conserve the number of rules and the number of
---   labels.
-prop_renumber :: Label -> IM.IntMap [Sentence] -> Property
-prop_renumber start intMap = start `IM.member` intMap ==>
-    let (intMap', renumbering, inverseRenumbering) = renumberMap start intMap
-        nRules = IM.size intMap
-        nLabels = IS.size $ collectLabels intMap
-     in nRules === IM.size intMap'
-           .&&. nLabels === VU.length renumbering
-           .&&. nLabels === IM.size inverseRenumbering
-           .&&. VU.head renumbering == start
-
 -----------------------------------------
---  now some properties about IntCFGs  --
+--  newtypes with Arbitrary instances  --
 -----------------------------------------
 
 labelMin :: Int
@@ -60,7 +35,8 @@ maxSentenceLength = 4
 newtype ASentence = ASentence Sentence deriving (Eq, Ord, Show)
 instance Arbitrary ASentence where
     arbitrary = do len <- elements [1..maxSentenceLength]
-                   coerce <$> vectorOf len (arbitrary :: Gen Label)
+                   asList <- vectorOf len (arbitrary :: Gen Label)
+                   coerce <$> return (VU.fromList asList)
 
 newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
 instance Arbitrary AIntCFG where
@@ -69,18 +45,6 @@ instance Arbitrary AIntCFG where
                    let start = fst $ head kvs
                    let (grammar, _, _) = productionsToIntCFG start kvs
                    return $ coerce grammar
-
-prop_checkLabels :: AIntCFG -> Property
-prop_checkLabels (AIntCFG (IntCFG maxLabel intMap)) =
-    let _labels = collectLabels intMap
-     in IS.findMin _labels === 0
-        .&&. IS.findMax _labels === maxLabel
-        .&&. IS.size _labels === maxLabel + 1
-
-
----------------------------------
---  properties about real CFG  --
----------------------------------
 
 newtype Terminal = Terminal Char deriving (Eq, Ord)
 instance Show Terminal where show (Terminal c) = [c]
@@ -107,6 +71,48 @@ instance Arbitrary ACharCFG where
                    values <- vectorOf grammarSize $ listOf1 $ listOf (elements allLabels)
                    return $ ACharCFG $ productionsToCharCFG start $ zip keys values
 
+------------------------------------------------------------------------------------
+--  some properties to test the functions that manipulate IntMaps, IntSets, etc.  --
+------------------------------------------------------------------------------------
+
+-- | All the map keys (nonterminals) and all the element of the sententials
+--   must be found as labels.
+prop_collectLabelsInclusion :: IM.IntMap [ASentence] -> Property
+prop_collectLabelsInclusion intMapA =
+    let intMap = coerce intMapA
+        _labels = collectLabels intMap
+        keys = IM.keysSet intMap
+        values = VU.concat $ coerce $ concat $ IM.elems intMap
+     in keys `IS.isSubsetOf` _labels .&&. VU.all (`IS.member` _labels) values
+
+-- | The renumbering must conserve the number of rules and the number of
+--   labels.
+prop_renumber :: Label -> IM.IntMap [ASentence] -> Property
+prop_renumber start intMapA = start `IM.member` intMapA ==>
+    let intMap = coerce intMapA
+        (intMap', renumbering, inverseRenumbering) = renumberMap start intMap
+        nRules = IM.size intMap
+        nLabels = IS.size $ collectLabels intMap
+     in nRules === IM.size intMap'
+           .&&. nLabels === VU.length renumbering
+           .&&. nLabels === IM.size inverseRenumbering
+           .&&. VU.head renumbering == start
+
+-----------------------------------------
+--  now some properties about IntCFGs  --
+-----------------------------------------
+
+prop_checkLabels :: AIntCFG -> Property
+prop_checkLabels (AIntCFG (IntCFG maxLabel intMap)) =
+    let _labels = collectLabels intMap
+     in IS.findMin _labels === 0
+        .&&. IS.findMax _labels === maxLabel
+        .&&. IS.size _labels === maxLabel + 1
+
+
+---------------------------------
+--  properties about real CFG  --
+---------------------------------
 
 prop_terminalsDisjointNonterminals :: ACharCFG -> Bool
 prop_terminalsDisjointNonterminals (ACharCFG g) = null $ getTerminals g `S.intersection` getNonTerminals g
