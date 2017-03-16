@@ -68,7 +68,6 @@ import qualified Data.Set as S
 import qualified Data.IntSet as IS
 import Data.Maybe (maybeToList, mapMaybe, fromJust)
 import Data.Foldable (foldr', foldr1)
-import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 
 {- |
@@ -79,7 +78,6 @@ associated with the same label are represented as lists of lists.
 class Grammar g where
     -- | The type of the elements of the alphabet described by the grammar @g@.
     data Repr g :: *
-    type Container g :: * -> *
     -- | @productions gr sym@ returns the productions associated with label @sym@ in grammar @gr@.
     productions :: g -> Repr g -> [[Repr g]]
     -- | Convert a label to a 'String'.
@@ -98,12 +96,6 @@ class Grammar g where
     getNonTerminals :: g -> S.Set (Repr g)
     -- | Returns the start symbol of the grammar
     startSymbol :: g -> Repr g
---    -- | Convert a sentence to a vector
---    sentenceToVector :: Sent g -> V.Vector (Repr g)
---    -- | Convert a vector to a sentence
---    vectorToSentence :: V.Vector (Repr g) -> Sent g
-
--- type Sent g = Container g (Repr g)
 
 -- | Pretty-print a sentence (a sequence of symbols).
 showSentence :: Grammar g
@@ -354,7 +346,6 @@ productionsToIntMap = IM.fromList
 
 instance Grammar IntCFG where
     data Repr IntCFG = ReprInt Label deriving (Eq, Ord, Show)
-    type Container IntCFG = VU.Vector
     -- all the instance declarations do is actually wrap and unwrap the Repr
     -- datatype
     productions g (ReprInt sym) =  map (map ReprInt) $ productionsInt g sym
@@ -490,7 +481,6 @@ startSymbolCFG (CFG start _ _ _) = start
 
 instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     data Repr (CFG a) = ReprCFG a deriving (Eq, Ord, Show)
-    type Container (CFG a) = V.Vector
     productions grammar (ReprCFG s) = map (map ReprCFG) $ productionsCFG grammar s
     showLabel = show
     isInGrammar (ReprCFG s) = isInCFG s
@@ -516,7 +506,6 @@ newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord)
 
 instance Grammar CharCFG where
     data Repr CharCFG = ReprChar Char deriving (Eq, Ord, Show)
-    type Container CharCFG = VU.Vector
     productions (CharCFG g) (ReprChar c) = map (map ReprChar) $ productionsCFG g c
     showLabel (ReprChar s) = [s]
     isInGrammar (ReprChar s) (CharCFG g)= isInCFG s g
@@ -545,7 +534,6 @@ newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord)
 
 instance Grammar StringCFG where
     data Repr StringCFG = ReprString String deriving (Eq, Ord, Show)
-    type Container StringCFG = V.Vector
     productions (StringCFG g) (ReprString s) = map (map ReprString) $ productionsCFG g s
     showLabel (ReprString s) = s
     isInGrammar (ReprString s) (StringCFG g)= isInCFG s g
