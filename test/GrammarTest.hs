@@ -2,6 +2,8 @@
 
 module GrammarTest
 ( runTests
+, ACharCFG(..)
+, ASentence(..)
 ) where
 
 -- system imports
