@@ -31,7 +31,7 @@ main = do print exampleGrammar
           let expansion = randomGrammarDeriveScan exampleGrammar
           TimeSpec _ seed <- getTime Realtime
           let strings = take 20 $ evalGrammar expansion $ fromIntegral seed
-          mapM_ (putStrLn . showSentence exampleGrammar) strings
+          mapM_ (putStrLn . showSentence) strings
           print digitsGrammar
           let digitExpansion = randomGrammarDerive digitsGrammar
-          putStrLn $ showSentence digitsGrammar $ evalGrammar digitExpansion $ fromIntegral seed
+          putStrLn $ showSentence $ evalGrammar digitExpansion $ fromIntegral seed

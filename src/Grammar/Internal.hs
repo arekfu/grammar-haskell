@@ -68,6 +68,7 @@ import qualified Data.Set as S
 import qualified Data.IntSet as IS
 import Data.Maybe (maybeToList, mapMaybe, fromJust)
 import Data.Foldable (foldr', foldr1)
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 
 {- |
@@ -77,11 +78,12 @@ associated with the same label are represented as lists of lists.
 -}
 class Grammar g where
     -- | The type of the elements of the alphabet described by the grammar @g@.
-    type Repr g :: *
+    data Repr g :: *
+    type Container g :: * -> *
     -- | @productions gr sym@ returns the productions associated with label @sym@ in grammar @gr@.
     productions :: g -> Repr g -> [[Repr g]]
     -- | Convert a label to a 'String'.
-    showLabel :: g -> Repr g -> String
+    showLabel :: Repr g -> String
     -- | Is this label part of the grammar?
     isInGrammar :: Repr g -> g -> Bool
     isInGrammar x gr = not $ isNotInGrammar x gr
@@ -96,14 +98,18 @@ class Grammar g where
     getNonTerminals :: g -> S.Set (Repr g)
     -- | Returns the start symbol of the grammar
     startSymbol :: g -> Repr g
+--    -- | Convert a sentence to a vector
+--    sentenceToVector :: Sent g -> V.Vector (Repr g)
+--    -- | Convert a vector to a sentence
+--    vectorToSentence :: V.Vector (Repr g) -> Sent g
 
+-- type Sent g = Container g (Repr g)
 
 -- | Pretty-print a sentence (a sequence of symbols).
 showSentence :: Grammar g
-             => g           -- ^ the grammar
-             -> [Repr g]    -- ^ the sentence
+             => [Repr g]    -- ^ the sentence
              -> String      -- ^ the sentence, pretty-printed as a String
-showSentence grammar = concatMap (showLabel grammar)
+showSentence = concatMap showLabel
 
 {- | Pretty-print all the production rules associated with a symbol.
 
@@ -117,9 +123,9 @@ showProductions :: Grammar g
                 => g            -- ^ the grammar
                 -> Repr g       -- ^ the label on the left-hand side of the rule
                 -> String       -- ^ the pretty-printed production rule
-showProductions grammar label = let header = showLabel grammar label
+showProductions grammar label = let header = showLabel label
                                     ls = productions grammar label
-                                 in concatMap (\l -> header ++ " -> " ++ showSentence grammar l ++ "\n") ls
+                                 in concatMap (\l -> header ++ " -> " ++ showSentence l ++ "\n") ls
 
 {- | Pretty-print all the production rules associated with a symbol, in
      Backus-Naur form.
@@ -131,15 +137,15 @@ showProductionsBNF :: Grammar g
                    => g            -- ^ the grammar
                    -> Repr g       -- ^ the label on the left-hand side of the rule
                    -> String       -- ^ the pretty-printed production rule
-showProductionsBNF grammar label = let header = showLabel grammar label
+showProductionsBNF grammar label = let header = showLabel label
                                        ls = productions grammar label
-                                    in header ++ " := " ++ joinProductionsBNF grammar ls ++ "\n"
+                                    in header ++ " := " ++ joinProductionsBNF ls ++ "\n"
 
 
 -- | Helper function to concatenate production rules in BNF form.
-joinProductionsBNF :: Grammar g => g -> [[Repr g]] -> String
-joinProductionsBNF _ [] = ""
-joinProductionsBNF grammar ps = foldr1 (\rule rest -> rule ++ " | " ++ rest) $ map (showSentence grammar) ps
+joinProductionsBNF :: Grammar g => [[Repr g]] -> String
+joinProductionsBNF [] = ""
+joinProductionsBNF ps = foldr1 (\rule rest -> rule ++ " | " ++ rest) $ map showSentence ps
 
 {- | Pretty-print all the production rules in a grammar.
 
@@ -347,15 +353,18 @@ productionsToIntMap :: [(Label, [Sentence])] -> IM.IntMap [Sentence]
 productionsToIntMap = IM.fromList
 
 instance Grammar IntCFG where
-    type Repr IntCFG = Label
-    productions = productionsInt
-    showLabel _ = show
-    isInGrammar = isInIntCFG
-    isNotInGrammar = isNotInIntCFG
-    getLabels = getLabelsInt
-    getTerminals = getTerminalsInt
-    getNonTerminals = getNonTerminalsInt
-    startSymbol _ = 0
+    data Repr IntCFG = ReprInt Label deriving (Eq, Ord, Show)
+    type Container IntCFG = VU.Vector
+    -- all the instance declarations do is actually wrap and unwrap the Repr
+    -- datatype
+    productions g (ReprInt sym) =  map (map ReprInt) $ productionsInt g sym
+    showLabel (ReprInt sym) = show sym
+    isInGrammar (ReprInt sym) = isInIntCFG sym
+    isNotInGrammar (ReprInt sym) = isNotInIntCFG sym
+    getLabels = S.map ReprInt . getLabelsInt
+    getTerminals = S.map ReprInt . getTerminalsInt
+    getNonTerminals = S.map ReprInt . getNonTerminalsInt
+    startSymbol _ = ReprInt 0
 
 instance Show IntCFG where show = showGrammarBNF
 
@@ -479,16 +488,17 @@ getNonTerminalsCFG (CFG _ iGr _ l2s) = let labels = getNonTerminalsInt iGr
 startSymbolCFG :: CFG a -> a
 startSymbolCFG (CFG start _ _ _) = start
 
-instance (Ord a, Show a) => Grammar (CFG a) where
-    type Repr (CFG a) = a
-    productions = productionsCFG
-    showLabel _ = show
-    isInGrammar = isInCFG
-    isNotInGrammar = isNotInCFG
-    getLabels = getLabelsCFG
-    getTerminals = getTerminalsCFG
-    getNonTerminals = getNonTerminalsCFG
-    startSymbol = startSymbolCFG
+instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
+    data Repr (CFG a) = ReprCFG a deriving (Eq, Ord, Show)
+    type Container (CFG a) = V.Vector
+    productions grammar (ReprCFG s) = map (map ReprCFG) $ productionsCFG grammar s
+    showLabel = show
+    isInGrammar (ReprCFG s) = isInCFG s
+    isNotInGrammar (ReprCFG s) = isNotInCFG s
+    getLabels = S.map ReprCFG . getLabelsCFG
+    getTerminals = S.map ReprCFG . getTerminalsCFG
+    getNonTerminals = S.map ReprCFG . getNonTerminalsCFG
+    startSymbol = ReprCFG . startSymbolCFG
 
 instance (Ord a, Show a) => Show (CFG a) where show = showGrammarBNF
 
@@ -505,15 +515,16 @@ instance (Ord a, Show a) => Show (CFG a) where show = showGrammarBNF
 newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord)
 
 instance Grammar CharCFG where
-    type Repr CharCFG = Char
-    productions (CharCFG g) = productionsCFG g
-    showLabel _ s = [s]
-    isInGrammar s (CharCFG g)= isInCFG s g
-    isNotInGrammar s (CharCFG g) = isNotInCFG s g
-    getLabels (CharCFG g) = getLabelsCFG g
-    getTerminals (CharCFG g) = getTerminalsCFG g
-    getNonTerminals (CharCFG g) = getNonTerminalsCFG g
-    startSymbol (CharCFG g) = startSymbol g
+    data Repr CharCFG = ReprChar Char deriving (Eq, Ord, Show)
+    type Container CharCFG = VU.Vector
+    productions (CharCFG g) (ReprChar c) = map (map ReprChar) $ productionsCFG g c
+    showLabel (ReprChar s) = [s]
+    isInGrammar (ReprChar s) (CharCFG g)= isInCFG s g
+    isNotInGrammar (ReprChar s) (CharCFG g) = isNotInCFG s g
+    getLabels (CharCFG g) = S.map ReprChar $ getLabelsCFG g
+    getTerminals (CharCFG g) = S.map ReprChar $ getTerminalsCFG g
+    getNonTerminals (CharCFG g) = S.map ReprChar $ getNonTerminalsCFG g
+    startSymbol (CharCFG g) = ReprChar $ startSymbolCFG g
 
 -- | Build a 'CharCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
@@ -533,15 +544,16 @@ instance Show CharCFG where show = showGrammarBNF
 newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord)
 
 instance Grammar StringCFG where
-    type Repr StringCFG = String
-    productions (StringCFG g) = productionsCFG g
-    showLabel _ s = s
-    isInGrammar s (StringCFG g)= isInCFG s g
-    isNotInGrammar s (StringCFG g) = isNotInCFG s g
-    getLabels (StringCFG g) = getLabelsCFG g
-    getTerminals (StringCFG g) = getTerminalsCFG g
-    getNonTerminals (StringCFG g) = getNonTerminalsCFG g
-    startSymbol (StringCFG g) = startSymbol g
+    data Repr StringCFG = ReprString String deriving (Eq, Ord, Show)
+    type Container StringCFG = V.Vector
+    productions (StringCFG g) (ReprString s) = map (map ReprString) $ productionsCFG g s
+    showLabel (ReprString s) = s
+    isInGrammar (ReprString s) (StringCFG g)= isInCFG s g
+    isNotInGrammar (ReprString s) (StringCFG g) = isNotInCFG s g
+    getLabels (StringCFG g) = S.map ReprString $ getLabelsCFG g
+    getTerminals (StringCFG g) = S.map ReprString $ getTerminalsCFG g
+    getNonTerminals (StringCFG g) = S.map ReprString $ getNonTerminalsCFG g
+    startSymbol (StringCFG g) = ReprString $ startSymbolCFG g
 
 -- | Build a 'StringCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG
