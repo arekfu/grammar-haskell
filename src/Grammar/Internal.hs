@@ -246,10 +246,10 @@ productionsInt (IntCFG _ prods) nt = let inMap = IM.lookup nt prods
                                       in concat $ maybeToList inMap
 
 isInIntCFG :: Label -> IntCFG -> Bool
-isInIntCFG c (IntCFG n _) = c < n
+isInIntCFG c (IntCFG n _) = c >= 0 && c < n
 
 isNotInIntCFG :: Label -> IntCFG -> Bool
-isNotInIntCFG c (IntCFG n _) = c >= n
+isNotInIntCFG c (IntCFG n _) = c < 0 || c >= n
 
 getSymbolsInt :: IntCFG -> S.Set Label
 getSymbolsInt (IntCFG n _) = S.fromDistinctAscList [0..n-1]
