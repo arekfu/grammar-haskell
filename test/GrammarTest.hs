@@ -116,6 +116,9 @@ prop_checkLabels (AIntCFG (IntCFG maxLabel intMap)) =
 --  properties about real CFG  --
 ---------------------------------
 
+prop_allSymbolsAreInGrammar :: ACharCFG -> Bool
+prop_allSymbolsAreInGrammar (ACharCFG g) = all (`isInGrammar` g) $ getSymbols g
+
 prop_terminalsDisjointNonterminals :: ACharCFG -> Bool
 prop_terminalsDisjointNonterminals (ACharCFG g) = null $ getTerminals g `S.intersection` getNonTerminals g
 
