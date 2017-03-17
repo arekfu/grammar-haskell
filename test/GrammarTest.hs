@@ -12,6 +12,8 @@ import qualified Data.IntMap as IM
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.IntSet as IS
 import qualified Data.Set as S
+import qualified Data.Vector as V
+import qualified Data.Map as M
 import Data.Coerce
 
 -- local imports
@@ -42,7 +44,7 @@ instance Arbitrary ASentence where
 
 newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
 instance Arbitrary AIntCFG where
-    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, [ASentence])]
+    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, NonEmptyList ASentence)]
                    let kvs = coerce akvs
                    let start = fst $ head kvs
                    let (grammar, _, _) = productionsToIntCFG start kvs
@@ -68,10 +70,8 @@ instance Arbitrary ACharCFG where
                    let nonTerminals = coerce wNonTerminals
                    let start = head nonTerminals
                    let allLabels = terminals ++ nonTerminals
-                   Positive grammarSize <- arbitrary :: Gen (Positive Int)
-                   keys <- vectorOf grammarSize $ elements nonTerminals
-                   values <- vectorOf grammarSize $ listOf1 $ listOf (elements allLabels)
-                   return $ ACharCFG $ productionsToCharCFG start $ zip keys values
+                   values <- vectorOf (length nonTerminals) $ listOf1 $ listOf (elements allLabels)
+                   return $ ACharCFG $ productionsToCharCFG start $ zip nonTerminals values
 
 ------------------------------------------------------------------------------------
 --  some properties to test the functions that manipulate IntMaps, IntSets, etc.  --
@@ -100,16 +100,30 @@ prop_renumber start intMapA = start `IM.member` intMapA ==>
            .&&. nLabels === IM.size inverseRenumbering
            .&&. VU.head renumbering == start
 
+prop_labelAllSymbols :: [(Char, [String])] -> Property
+prop_labelAllSymbols kvs =
+    let (_, labelling, inverseLabelling) = labelAllSymbols kvs
+        in V.length labelling === M.size inverseLabelling
+
 -----------------------------------------
 --  now some properties about IntCFGs  --
 -----------------------------------------
 
 prop_checkLabels :: AIntCFG -> Property
-prop_checkLabels (AIntCFG (IntCFG maxLabel intMap)) =
+prop_checkLabels (AIntCFG (IntCFG maxLabel _ intMap)) =
     let _labels = collectLabels intMap
      in IS.findMin _labels === 0
         .&&. IS.findMax _labels === maxLabel
         .&&. IS.size _labels === maxLabel + 1
+
+prop_terminalsDisjointNonterminalsInt :: AIntCFG -> Bool
+prop_terminalsDisjointNonterminalsInt (AIntCFG g) = null $ getTerminals g `S.intersection` getNonTerminals g
+
+prop_terminalsHaveNoProductionsInt :: AIntCFG -> Bool
+prop_terminalsHaveNoProductionsInt (AIntCFG g) = all (null . productions g) $ getTerminals g
+
+prop_nonTerminalsHaveProductionsInt :: AIntCFG -> Bool
+prop_nonTerminalsHaveProductionsInt (AIntCFG g) = all (not . null . productions g) $ getNonTerminals g
 
 
 ---------------------------------
