@@ -14,6 +14,7 @@ import qualified Data.IntSet as IS
 import qualified Data.Set as S
 import qualified Data.Vector as V
 import qualified Data.Map as M
+import qualified Data.Sequence as Seq
 import Data.Coerce
 
 -- local imports
@@ -40,11 +41,17 @@ newtype ASentence = ASentence Sentence deriving (Eq, Ord, Show)
 instance Arbitrary ASentence where
     arbitrary = do len <- elements [1..maxSentenceLength]
                    asList <- vectorOf len (arbitrary :: Gen Label)
-                   coerce <$> return (VU.fromList asList)
+                   coerce <$> return (Seq.fromList asList)
+
+newtype ASentences = ASentences Sentences deriving (Eq, Ord, Show)
+instance Arbitrary ASentences where
+    arbitrary = do asents <- listOf1 arbitrary :: Gen [ASentence]
+                   let sents = coerce asents
+                   return $ ASentences (V.fromList sents)
 
 newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
 instance Arbitrary AIntCFG where
-    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, NonEmptyList ASentence)]
+    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, ASentences)]
                    let kvs = coerce akvs
                    let start = fst $ head kvs
                    let (grammar, _, _) = productionsToIntCFG start kvs
@@ -79,17 +86,17 @@ instance Arbitrary ACharCFG where
 
 -- | All the map keys (nonterminals) and all the element of the sententials
 --   must be found as labels.
-prop_collectLabelsInclusion :: IM.IntMap [ASentence] -> Property
+prop_collectLabelsInclusion :: IM.IntMap ASentences -> Property
 prop_collectLabelsInclusion intMapA =
     let intMap = coerce intMapA
         _labels = collectLabels intMap
         keys = IM.keysSet intMap
-        values = VU.concat $ coerce $ concat $ IM.elems intMap
-     in keys `IS.isSubsetOf` _labels .&&. VU.all (`IS.member` _labels) values
+        values = IM.elems intMap
+     in keys `IS.isSubsetOf` _labels .&&. all (\v -> all (\s -> all (\sym -> sym `IS.member` _labels) s) v) values
 
 -- | The renumbering must conserve the number of rules and the number of
 --   labels.
-prop_renumber :: Label -> IM.IntMap [ASentence] -> Property
+prop_renumber :: Label -> IM.IntMap ASentences -> Property
 prop_renumber start intMapA = start `IM.member` intMapA ==>
     let intMap = coerce intMapA
         (intMap', renumbering, inverseRenumbering) = renumberMap start intMap
