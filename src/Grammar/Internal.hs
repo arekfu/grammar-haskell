@@ -46,6 +46,7 @@ module Grammar.Internal
 , renumberMap
 -- * Context free grammars over alphabets of arbitrary types
 , CFG(..)
+, Repr(..)
 , productionsToCFG
 , gatherAllSymbols
 , labelAllSymbols
@@ -175,9 +176,10 @@ showGrammarWith :: (Grammar g, Show (Repr g))
                 -> String                   -- ^ its pretty-printed representation as a String
 showGrammarWith showProds grammar = let syms = S.toList $ getNonTerminals grammar
                                         prods = concatMap (showProds grammar) syms
+                                        start = "\nStart: " ++ showSymbol (startSymbol grammar)
                                         terms = "\nTerminals: " ++ show (getTerminals grammar)
                                         nonterms = "\nNonterminals: " ++ show (getNonTerminals grammar)
-                                     in prods ++ terms ++ nonterms
+                                     in prods ++ start ++ terms ++ nonterms
 
 
 {- | Pretty-print all the production rules in a grammar.
@@ -351,7 +353,7 @@ intMapToIntCFG start intMap = let (intMap', inverseRelabelling, relabelling) = r
      such a way that they exactly span the @[0,n-1]@ interval. The
      correspondence between the new and the old numbering scheme
      ('InverseRelabellingInt') is returned as a 'Data.Vector.Unboxed.Vector'.
-     The mapping in the other direction ('Labelling') is actually an
+     The mapping in the other direction ('SymbolToLabelDict') is actually an
      'Data.IntMap.IntMap'.  The starting symbol is always renumbered as 0.
 -}
 renumberMap :: Label                -- ^ The label of the starting symbol
@@ -408,49 +410,47 @@ Conversion in the opposite direction (from __labels__ to __symbols__) are
 represented by a 'Data.Vector.Vector', because labels are guaranteed to span a
 continuous range starting at @0@ (see 'IntCFG').
 -}
-data CFG a = CFG a IntCFG (Labelling a) (InverseLabelling a)
+data CFG a = CFG a IntCFG (SymbolToLabelDict a) (LabelToSymbolDict a)
              deriving (Eq, Ord)
 
-type InverseLabelling a = V.Vector a
-type Labelling a = M.Map a Label
+type LabelToSymbolDict a = V.Vector a
+type SymbolToLabelDict a = M.Map a Label
 
 -- | Convert a symbol to a label, given a dictionary.
 toLabel :: Ord a
-        => Labelling a  -- ^ the symbol-to-label dictionary
+        => SymbolToLabelDict a  -- ^ the symbol-to-label dictionary
         -> a            -- ^ the symbol to convert
         -> Maybe Label  -- ^ the resulting label, maybe
 toLabel dict symbol = M.lookup symbol dict
 
 -- | Like 'toLabel', but assume the symbol is in the dictionary.
-unsafeToLabel :: Ord a => Labelling a -> a -> Label
+unsafeToLabel :: Ord a => SymbolToLabelDict a -> a -> Label
 unsafeToLabel dict = fromJust . toLabel dict
 
 -- | Convert a label to a symbol, given a dictionary.
-toSymbol :: InverseLabelling a  -- ^ the label-to-symbol dictionary
+toSymbol :: LabelToSymbolDict a  -- ^ the label-to-symbol dictionary
          -> Label               -- ^ the label to convert
          -> Maybe a             -- ^ the resulting symbol, maybe
 toSymbol dict label = dict V.!? label
 
 -- | Like 'toSymbol', but assume the label is in the dictionary.
-unsafeToSymbol :: InverseLabelling a -> Label -> a
+unsafeToSymbol :: LabelToSymbolDict a -> Label -> a
 unsafeToSymbol dict label =  dict V.! label
 
--- | Convert a string of symbols to a sequence of labels. Symbols that do not
---   belong to the grammar alphabet are silently expunged.
-symbolsToSentence :: Ord a => Labelling a -> [a] -> Sentence
+-- | Convert a string of symbols to a sequence of labels.
+symbolsToSentence :: Ord a => SymbolToLabelDict a -> [a] -> Sentence
 symbolsToSentence dict = Seq.fromList . map (unsafeToLabel dict)
 
 -- | Convert a list of symbol strings to a list of label sentences.
-symbolsToSentences :: Ord a => Labelling a -> [[a]] -> Sentences
+symbolsToSentences :: Ord a => SymbolToLabelDict a -> [[a]] -> Sentences
 symbolsToSentences dict = V.fromList . map (symbolsToSentence dict)
 
--- | Convert a list of labels (a sentence) to a string of symbols. Labels
---   that do not belong to the grammar alphabet are silently expunged.
-sentenceToSymbols :: InverseLabelling a -> Sentence -> [a]
+-- | Convert a list of labels (a sentence) to a string of symbols.
+sentenceToSymbols :: LabelToSymbolDict a -> Sentence -> [a]
 sentenceToSymbols dict = map (unsafeToSymbol dict) . toList
 
 -- | Convert a list of label sentences to a list of symbol strings.
-sentencesToSymbols :: InverseLabelling a -> Sentences -> [[a]]
+sentencesToSymbols :: LabelToSymbolDict a -> Sentences -> [[a]]
 sentencesToSymbols dict = V.toList . fmap (sentenceToSymbols dict)
 
 -- | Extract all the symbols from an association list of production rules.
@@ -464,25 +464,25 @@ gatherAllSymbols = foldr' insertKeyValue S.empty
      of labels, along with dictionaries to translate symbols to labels and
      vice-versa.
 -}
-labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Sentences)], InverseLabelling a, Labelling a)
+labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Sentences)], LabelToSymbolDict a, SymbolToLabelDict a)
 labelAllSymbols kvs = let allSymbols = gatherAllSymbols kvs
-                          inverseLabelling = V.fromList $ S.toList allSymbols
-                          labelling = invertLabelling inverseLabelling
-                          labelledAssocList = labelKeyValues kvs labelling
-                       in (labelledAssocList, inverseLabelling, labelling)
+                          labelsToSymbols = V.fromList $ S.toList allSymbols
+                          symbolsToLabels = invertSymbolToLabelDict labelsToSymbols
+                          labelledAssocList = labelKeyValues kvs symbolsToLabels
+                       in (labelledAssocList, labelsToSymbols, symbolsToLabels)
 
-labelKeyValues :: Ord a => [(a, [[a]])] -> Labelling a -> [(Label, Sentences)]
+labelKeyValues :: Ord a => [(a, [[a]])] -> SymbolToLabelDict a -> [(Label, Sentences)]
 labelKeyValues kvs dict =
     let translate s = fromJust $ M.lookup s dict
      in map (\(k, vs) -> (translate k, V.fromList $ map (Seq.fromList . map translate) vs)) kvs
 
 -- | Invert an 'Int'-to-@a@ labelling.
-invertLabelling :: Ord a => InverseLabelling a -> Labelling a
-invertLabelling = V.ifoldr' (\i sym inverse -> M.insert sym i inverse) M.empty
+invertSymbolToLabelDict :: Ord a => LabelToSymbolDict a -> SymbolToLabelDict a
+invertSymbolToLabelDict = V.ifoldr' (\i sym inverse -> M.insert sym i inverse) M.empty
 
-relabel :: InverseLabelling a -> InverseRelabellingInt -> InverseLabelling a
-relabel inverseLabelling inverseRelabelling =
-    V.generate (V.length inverseLabelling) (\i -> inverseLabelling V.! (inverseRelabelling VU.! i))
+relabel :: LabelToSymbolDict a -> InverseRelabellingInt -> LabelToSymbolDict a
+relabel labelsToSymbols inverseRelabelling =
+    V.generate (V.length labelsToSymbols) (\i -> labelsToSymbols V.! (inverseRelabelling VU.! i))
 
 {- | Build a 'CFG' from an association list of @(nonterminal, productions)@
      pairs. Here a production is a list of lists of labels.
@@ -500,12 +500,12 @@ relabel inverseLabelling inverseRelabelling =
 -}
 productionsToCFG :: (Ord a, Show a) => a -> [(a, [[a]])] -> CFG a
 productionsToCFG start kvs =
-    let (ikvs, inverseLabelling, labelling) = labelAllSymbols kvs
-        startLabel = fromJust $ M.lookup start labelling
+    let (ikvs, labelsToSymbols, symbolsToLabels) = labelAllSymbols kvs
+        startLabel = fromJust $ M.lookup start symbolsToLabels
         (intCFG, inverseRelabelling, _) = productionsToIntCFG startLabel ikvs
-        labelsToSymbols = relabel inverseLabelling inverseRelabelling
-        symbolsToLabels = invertLabelling labelsToSymbols
-     in CFG start intCFG symbolsToLabels labelsToSymbols
+        labelsToSymbols' = relabel labelsToSymbols inverseRelabelling
+        symbolsToLabels' = invertSymbolToLabelDict labelsToSymbols'
+     in CFG start intCFG symbolsToLabels' labelsToSymbols'
 
 productionsCFG :: Ord a => CFG a -> a -> [[a]]
 productionsCFG (CFG _ iGr s2l l2s) symbol =

@@ -109,8 +109,8 @@ prop_renumber start intMapA = start `IM.member` intMapA ==>
 
 prop_labelAllSymbols :: [(Char, [String])] -> Property
 prop_labelAllSymbols kvs =
-    let (_, labelling, inverseLabelling) = labelAllSymbols kvs
-        in V.length labelling === M.size inverseLabelling
+    let (_, labelsToSymbols, symbolsToLabels) = labelAllSymbols kvs
+        in V.length labelsToSymbols === M.size symbolsToLabels
 
 -----------------------------------------
 --  now some properties about IntCFGs  --
@@ -137,17 +137,26 @@ prop_nonTerminalsHaveProductionsInt (AIntCFG g) = all (not . null . productions 
 --  properties about real CFG  --
 ---------------------------------
 
-prop_allSymbolsAreInGrammar :: ACharCFG -> Bool
-prop_allSymbolsAreInGrammar (ACharCFG g) = all (`isInGrammar` g) $ getSymbols g
+prop_allSymbolsAreInGrammar :: ACharCFG -> Property
+prop_allSymbolsAreInGrammar (ACharCFG g) =
+    conjoin $
+        map (\s -> counterexample ("missing symbol: " ++ show s) $ s `isInGrammar` g)
+            $ S.toList $ getSymbols g
 
 prop_terminalsDisjointNonterminals :: ACharCFG -> Bool
 prop_terminalsDisjointNonterminals (ACharCFG g) = null $ getTerminals g `S.intersection` getNonTerminals g
 
-prop_terminalsHaveNoProductions :: ACharCFG -> Bool
-prop_terminalsHaveNoProductions (ACharCFG g) = all (null . productions g) $ getTerminals g
+prop_terminalsHaveNoProductions :: ACharCFG -> Property
+prop_terminalsHaveNoProductions (ACharCFG g) =
+    conjoin $
+        map (\s -> counterexample ("failing symbol: " ++ show s) $ null $ productions g s)
+            $ S.toList $ getTerminals g
 
-prop_nonTerminalsHaveProductions :: ACharCFG -> Bool
-prop_nonTerminalsHaveProductions (ACharCFG g) = all (not . null . productions g) $ getNonTerminals g
+prop_nonTerminalsHaveProductions :: ACharCFG -> Property
+prop_nonTerminalsHaveProductions (ACharCFG g) =
+    conjoin $
+        map (\s -> counterexample ("failing symbol: " ++ show s) $ not $ null $ productions g s)
+            $ S.toList $ getNonTerminals g
 
 
 return []
