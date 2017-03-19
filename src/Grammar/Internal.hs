@@ -305,21 +305,21 @@ type RelabellingInt = IM.IntMap Int
 invert :: InverseRelabellingInt -> RelabellingInt
 invert = VU.ifoldr' (\i label inverse -> IM.insert label i inverse) IM.empty
 
--- | Apply the relabelling to a given 'Label'.
-renumberLabel :: InverseRelabellingInt -> Label -> Label
-renumberLabel renumb label = renumb VU.! label
-
--- | Apply the relabelling to a given 'Sentence'
-renumberSentence :: InverseRelabellingInt -> Sentence -> Sentence
-renumberSentence renumb = fmap (renumberLabel renumb)
-
--- | Apply the inverse relabelling to a given 'Label'
-inverseRenumberLabel :: RelabellingInt -> Label -> Label
-inverseRenumberLabel iRenumb label = fromJust $ IM.lookup label iRenumb
+-- | Apply the inverse relabelling to a given 'Label'.
+inverseRenumberLabel :: InverseRelabellingInt -> Label -> Label
+inverseRenumberLabel renumb label = renumb VU.! label
 
 -- | Apply the inverse relabelling to a given 'Sentence'
-inverseRenumberSentence :: RelabellingInt -> Sentence -> Sentence
-inverseRenumberSentence iRenumb = fmap (inverseRenumberLabel iRenumb)
+inverseRenumberSentence :: InverseRelabellingInt -> Sentence -> Sentence
+inverseRenumberSentence renumb = fmap (inverseRenumberLabel renumb)
+
+-- | Apply the relabelling to a given 'Label'
+renumberLabel :: RelabellingInt -> Label -> Label
+renumberLabel iRenumb label = fromJust $ IM.lookup label iRenumb
+
+-- | Apply the relabelling to a given 'Sentence'
+renumberSentence :: RelabellingInt -> Sentence -> Sentence
+renumberSentence iRenumb = fmap (renumberLabel iRenumb)
 
 -- | Return all labels appearing in a set of (integer) production rules.
 collectLabels :: IM.IntMap Sentences -> IS.IntSet
@@ -342,17 +342,17 @@ productionsToIntCFG start = intMapToIntCFG start . productionsToIntMap
      values.
 -}
 intMapToIntCFG :: Label -> IM.IntMap Sentences -> (IntCFG, InverseRelabellingInt, RelabellingInt)
-intMapToIntCFG start intMap = let (intMap', relabelling, inverseRelabelling) = renumberMap start intMap
-                                  maxLabel = VU.length relabelling - 1
+intMapToIntCFG start intMap = let (intMap', inverseRelabelling, relabelling) = renumberMap start intMap
+                                  maxLabel = VU.length inverseRelabelling - 1
                                   nNonTerms = IM.size intMap
-                               in (IntCFG maxLabel nNonTerms intMap', relabelling, inverseRelabelling)
+                               in (IntCFG maxLabel nNonTerms intMap', inverseRelabelling, relabelling)
 
 {- | Renumber the @n@ integers that appear as keys and values of the map in
      such a way that they exactly span the @[0,n-1]@ interval. The
      correspondence between the new and the old numbering scheme
-     ('InverseRelabellingInt') is returned as a 'Data.Vector.Unboxed.Vector'. The
-     inverse mapping is returned as an 'Data.IntMap.IntMap'. The starting
-     symbol is always renumbered as 0.
+     ('InverseRelabellingInt') is returned as a 'Data.Vector.Unboxed.Vector'.
+     The mapping in the other direction ('Labelling') is actually an
+     'Data.IntMap.IntMap'.  The starting symbol is always renumbered as 0.
 -}
 renumberMap :: Label                -- ^ The label of the starting symbol
             -> IM.IntMap Sentences -- ^ The map to renumber
@@ -363,11 +363,11 @@ renumberMap start intMap =
         nonTerms = IM.keysSet intMap
         nonTermsExceptStart = IS.delete start nonTerms
         terms = allLabels `IS.difference` nonTerms
-        relabelling = VU.fromList $ start : IS.toList nonTermsExceptStart ++ IS.toList terms
-        inverseRelabelling = invert relabelling
-        intMap' = IM.mapKeys (inverseRenumberLabel inverseRelabelling) intMap
-        intMap'' = fmap (fmap (inverseRenumberSentence inverseRelabelling)) intMap'
-     in (intMap'', relabelling, inverseRelabelling)
+        inverseRelabelling = VU.fromList $ start : IS.toList nonTermsExceptStart ++ IS.toList terms
+        relabelling = invert inverseRelabelling
+        intMap' = IM.mapKeys (renumberLabel relabelling) intMap
+        intMap'' = fmap (fmap (renumberSentence relabelling)) intMap'
+     in (intMap'', inverseRelabelling, relabelling)
 
 {- | Provide the fundamental building block to construct an 'IntCFG' from an
      association list of @(nonterminal, productions)@ pairs. The Labels are
@@ -380,7 +380,7 @@ instance Grammar IntCFG where
     data Repr IntCFG = ReprInt Label deriving (Eq, Ord, Show)
     -- all the instance declarations do is actually wrap and unwrap the Repr
     -- datatype
-    productions g (ReprInt sym) = toList $ fmap (fmap ReprInt . toList) $ productionsInt g sym
+    productions g (ReprInt sym) = toList $ (fmap ReprInt . toList) <$> productionsInt g sym
     showSymbol (ReprInt sym) = show sym
     isInGrammar (ReprInt sym) = isInIntCFG sym
     isNotInGrammar (ReprInt sym) = isNotInIntCFG sym
@@ -407,49 +407,49 @@ enforced at the level of the datatype.
 Conversion in the opposite direction (from __labels__ to __symbols__) are
 represented by a 'Data.IntMap.IntMap'.
 -}
-data CFG a = CFG a IntCFG (InverseLabelling a) (Labelling a)
+data CFG a = CFG a IntCFG (Labelling a) (InverseLabelling a)
              deriving (Eq, Ord)
 
-type Labelling a = V.Vector a
-type InverseLabelling a = M.Map a Label
+type InverseLabelling a = V.Vector a
+type Labelling a = M.Map a Label
 
 -- | Convert a symbol to a label, given a dictionary.
 toLabel :: Ord a
-        => InverseLabelling a -- ^ the symbol-to-label dictionary
-        -> a                  -- ^ the symbol to convert
-        -> Maybe Label        -- ^ the resulting label, maybe
+        => Labelling a  -- ^ the symbol-to-label dictionary
+        -> a            -- ^ the symbol to convert
+        -> Maybe Label  -- ^ the resulting label, maybe
 toLabel dict symbol = M.lookup symbol dict
 
 -- | Like 'toLabel', but assume the symbol is in the dictionary.
-unsafeToLabel :: Ord a => InverseLabelling a -> a -> Label
+unsafeToLabel :: Ord a => Labelling a -> a -> Label
 unsafeToLabel dict = fromJust . toLabel dict
 
 -- | Convert a label to a symbol, given a dictionary.
-toSymbol :: Labelling a -- ^ the label-to-symbol dictionary
-        -> Label        -- ^ the label to convert
-        -> Maybe a      -- ^ the resulting symbol, maybe
+toSymbol :: InverseLabelling a  -- ^ the label-to-symbol dictionary
+         -> Label               -- ^ the label to convert
+         -> Maybe a             -- ^ the resulting symbol, maybe
 toSymbol dict label = dict V.!? label
 
 -- | Like 'toSymbol', but assume the label is in the dictionary.
-unsafeToSymbol :: Labelling a -> Label -> a
+unsafeToSymbol :: InverseLabelling a -> Label -> a
 unsafeToSymbol dict label =  dict V.! label
 
 -- | Convert a string of symbols to a sequence of labels. Symbols that do not
 --   belong to the grammar alphabet are silently expunged.
-symbolsToSentence :: Ord a => InverseLabelling a -> [a] -> Sentence
+symbolsToSentence :: Ord a => Labelling a -> [a] -> Sentence
 symbolsToSentence dict = Seq.fromList . map (unsafeToLabel dict)
 
 -- | Convert a list of symbol strings to a list of label sentences.
-symbolsToSentences :: Ord a => InverseLabelling a -> [[a]] -> Sentences
+symbolsToSentences :: Ord a => Labelling a -> [[a]] -> Sentences
 symbolsToSentences dict = V.fromList . map (symbolsToSentence dict)
 
 -- | Convert a list of labels (a sentence) to a string of symbols. Labels
 --   that do not belong to the grammar alphabet are silently expunged.
-sentenceToSymbols :: Labelling a -> Sentence -> [a]
+sentenceToSymbols :: InverseLabelling a -> Sentence -> [a]
 sentenceToSymbols dict = map (unsafeToSymbol dict) . toList
 
 -- | Convert a list of label sentences to a list of symbol strings.
-sentencesToSymbols :: Labelling a -> Sentences -> [[a]]
+sentencesToSymbols :: InverseLabelling a -> Sentences -> [[a]]
 sentencesToSymbols dict = V.toList . fmap (sentenceToSymbols dict)
 
 -- | Extract all the symbols from an association list of production rules.
@@ -463,24 +463,25 @@ gatherAllSymbols = foldr' insertKeyValue S.empty
      of labels, along with dictionaries to translate symbols to labels and
      vice-versa.
 -}
-labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Sentences)], Labelling a, InverseLabelling a)
+labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Sentences)], InverseLabelling a, Labelling a)
 labelAllSymbols kvs = let allSymbols = gatherAllSymbols kvs
-                          labelling = V.fromList $ S.toList allSymbols
-                          inverseLabelling = invertLabelling labelling
-                          labelledAssocList = renumberKeyValues kvs inverseLabelling
-                       in (labelledAssocList, labelling, inverseLabelling)
+                          inverseLabelling = V.fromList $ S.toList allSymbols
+                          labelling = invertLabelling inverseLabelling
+                          labelledAssocList = labelKeyValues kvs labelling
+                       in (labelledAssocList, inverseLabelling, labelling)
 
-renumberKeyValues :: Ord a => [(a, [[a]])] -> InverseLabelling a -> [(Label, Sentences)]
-renumberKeyValues kvs dict =
+labelKeyValues :: Ord a => [(a, [[a]])] -> Labelling a -> [(Label, Sentences)]
+labelKeyValues kvs dict =
     let translate s = fromJust $ M.lookup s dict
      in map (\(k, vs) -> (translate k, V.fromList $ map (Seq.fromList . map translate) vs)) kvs
 
 -- | Invert an 'Int'-to-@a@ labelling.
-invertLabelling :: Ord a => Labelling a -> InverseLabelling a
+invertLabelling :: Ord a => InverseLabelling a -> Labelling a
 invertLabelling = V.ifoldr' (\i sym inverse -> M.insert sym i inverse) M.empty
 
-relabel :: Labelling a -> InverseRelabellingInt -> Labelling a
-relabel labelling relabelling = V.generate (V.length labelling) (\i -> labelling V.! (relabelling VU.! i))
+relabel :: InverseLabelling a -> InverseRelabellingInt -> InverseLabelling a
+relabel inverseLabelling inverseRelabelling =
+    V.generate (V.length inverseLabelling) (\i -> inverseLabelling V.! (inverseRelabelling VU.! i))
 
 {- | Build a 'CFG' from an association list of @(nonterminal, productions)@
      pairs. Here a production is a list of lists of labels.
@@ -498,12 +499,12 @@ relabel labelling relabelling = V.generate (V.length labelling) (\i -> labelling
 -}
 productionsToCFG :: (Ord a, Show a) => a -> [(a, [[a]])] -> CFG a
 productionsToCFG start kvs =
-    let (ikvs, labelling, inverseLabelling) = labelAllSymbols kvs
-        startLabel = fromJust $ M.lookup start inverseLabelling
-        (intCFG, relabelling, _) = productionsToIntCFG startLabel ikvs
-        symbolsToLabels = relabel labelling relabelling
-        labelsToSymbols = invertLabelling symbolsToLabels
-     in CFG start intCFG labelsToSymbols symbolsToLabels
+    let (ikvs, inverseLabelling, labelling) = labelAllSymbols kvs
+        startLabel = fromJust $ M.lookup start labelling
+        (intCFG, inverseRelabelling, _) = productionsToIntCFG startLabel ikvs
+        labelsToSymbols = relabel inverseLabelling inverseRelabelling
+        symbolsToLabels = invertLabelling labelsToSymbols
+     in CFG start intCFG symbolsToLabels labelsToSymbols
 
 productionsCFG :: Ord a => CFG a -> a -> [[a]]
 productionsCFG (CFG _ iGr s2l l2s) symbol =
