@@ -102,8 +102,10 @@ class Grammar g where
     getSymbols :: g -> S.Set (Repr g)
     -- | Returns the set of all terminals used in the grammar
     getTerminals :: g -> S.Set (Repr g)
+    getTerminals g = S.filter (`isTerminal` g) $ getSymbols g
     -- | Returns the set of all nonterminals used in the grammar
     getNonTerminals :: g -> S.Set (Repr g)
+    getNonTerminals g = S.filter (`isNonTerminal` g) $ getSymbols g
     -- | Returns the start symbol of the grammar
     startSymbol :: g -> Repr g
 
