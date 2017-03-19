@@ -405,7 +405,8 @@ variable @a@ is required to be in class 'Ord', although this constraint is not
 enforced at the level of the datatype.
 
 Conversion in the opposite direction (from __labels__ to __symbols__) are
-represented by a 'Data.IntMap.IntMap'.
+represented by a 'Data.Vector.Vector', because labels are guaranteed to span a
+continuous range starting at @0@ (see 'IntCFG').
 -}
 data CFG a = CFG a IntCFG (Labelling a) (InverseLabelling a)
              deriving (Eq, Ord)
