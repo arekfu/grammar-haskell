@@ -17,7 +17,7 @@ module Grammar
 , pick
 -- ** Pretty-printing parts of a grammar
 -- $examplegrammar
-, showSentence
+, showWord
 , showProductions
 , showGrammar
 -- * Context-free grammars over alphabets of integers

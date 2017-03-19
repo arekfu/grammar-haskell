@@ -3,10 +3,11 @@
 module GrammarTest
 ( runTests
 , ACharCFG(..)
-, ASentence(..)
+, AWord(..)
 ) where
 
 -- system imports
+import Prelude hiding (Word)
 import Test.QuickCheck
 import qualified Data.IntMap as IM
 import qualified Data.Vector.Unboxed as VU
@@ -34,24 +35,24 @@ newtype ALabel = ALabel Label deriving (Eq, Ord, Show)
 instance Arbitrary ALabel where
     arbitrary = coerce <$> elements [labelMin..labelMax]
 
-maxSentenceLength :: Int
-maxSentenceLength = 4
+maxWordLength :: Int
+maxWordLength = 4
 
-newtype ASentence = ASentence Sentence deriving (Eq, Ord, Show)
-instance Arbitrary ASentence where
-    arbitrary = do len <- elements [1..maxSentenceLength]
+newtype AWord = AWord Word deriving (Eq, Ord, Show)
+instance Arbitrary AWord where
+    arbitrary = do len <- elements [1..maxWordLength]
                    asList <- vectorOf len (arbitrary :: Gen Label)
                    coerce <$> return (Seq.fromList asList)
 
-newtype ASentences = ASentences Sentences deriving (Eq, Ord, Show)
-instance Arbitrary ASentences where
-    arbitrary = do asents <- listOf1 arbitrary :: Gen [ASentence]
+newtype AWords = AWords Words deriving (Eq, Ord, Show)
+instance Arbitrary AWords where
+    arbitrary = do asents <- listOf1 arbitrary :: Gen [AWord]
                    let sents = coerce asents
-                   return $ ASentences (V.fromList sents)
+                   return $ AWords (V.fromList sents)
 
 newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
 instance Arbitrary AIntCFG where
-    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, ASentences)]
+    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, AWords)]
                    let kvs = coerce akvs
                    let start = fst $ head kvs
                    let (grammar, _, _) = productionsToIntCFG start kvs
@@ -86,7 +87,7 @@ instance Arbitrary ACharCFG where
 
 -- | All the map keys (nonterminals) and all the element of the sententials
 --   must be found as labels.
-prop_collectLabelsInclusion :: IM.IntMap ASentences -> Property
+prop_collectLabelsInclusion :: IM.IntMap AWords -> Property
 prop_collectLabelsInclusion intMapA =
     let intMap = coerce intMapA
         _labels = collectLabels intMap
@@ -96,7 +97,7 @@ prop_collectLabelsInclusion intMapA =
 
 -- | The renumbering must conserve the number of rules and the number of
 --   labels.
-prop_renumber :: Label -> IM.IntMap ASentences -> Property
+prop_renumber :: Label -> IM.IntMap AWords -> Property
 prop_renumber start intMapA = start `IM.member` intMapA ==>
     let intMap = coerce intMapA
         (intMap', renumbering, inverseRenumbering) = renumberMap start intMap

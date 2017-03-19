@@ -20,7 +20,7 @@ module Grammar.Internal
 , pick
 -- ** Pretty-printing parts of a grammar
 -- $examplegrammar
-, showSentence
+, showWord
 , showProductions
 , showProductionsBNF
 , showGrammarWith
@@ -30,8 +30,8 @@ module Grammar.Internal
 , IntCFG(..)
 -- ** Type synonims
 , Label
-, Sentence
-, Sentences
+, Word
+, Words
 , InverseRelabellingInt
 , RelabellingInt
 -- ** Manipulators
@@ -39,9 +39,9 @@ module Grammar.Internal
 , intMapToIntCFG
 , productionsToIntCFG
 , renumberLabel
-, renumberSentence
+, renumberWord
 , inverseRenumberLabel
-, inverseRenumberSentence
+, inverseRenumberWord
 , collectLabels
 , renumberMap
 -- * Context free grammars over alphabets of arbitrary types
@@ -54,10 +54,10 @@ module Grammar.Internal
 , toLabel
 , unsafeToSymbol
 , unsafeToLabel
-, symbolsToSentence
-, symbolsToSentences
-, sentenceToSymbols
-, sentencesToSymbols
+, symbolsToWord
+, symbolsToWords
+, wordToSymbols
+, wordsToSymbols
 -- * Context-free grammars over alphabets of specific types
 , CharCFG(..)
 , productionsToCharCFG
@@ -66,6 +66,7 @@ module Grammar.Internal
 ) where
 
 -- system imports
+import Prelude hiding (Word)
 import qualified Data.Map.Strict as M
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Set as S
@@ -110,11 +111,11 @@ class Grammar g where
     -- | Returns the start symbol of the grammar
     startSymbol :: g -> Repr g
 
--- | Pretty-print a sentence (a sequence of symbols).
-showSentence :: Grammar g
-             => [Repr g]    -- ^ the sentence
-             -> String      -- ^ the sentence, pretty-printed as a String
-showSentence = concatMap showSymbol
+-- | Pretty-print a word (a sequence of symbols).
+showWord :: Grammar g
+         => [Repr g]    -- ^ the word
+         -> String      -- ^ the word, pretty-printed as a String
+showWord = concatMap showSymbol
 
 {- | Pretty-print all the production rules associated with a symbol.
 
@@ -130,7 +131,7 @@ showProductions :: Grammar g
                 -> String       -- ^ the pretty-printed production rule
 showProductions grammar sym = let header = showSymbol sym
                                   ls = productions grammar sym
-                               in concatMap (\l -> header ++ " -> " ++ showSentence l ++ "\n") ls
+                               in concatMap (\l -> header ++ " -> " ++ showWord l ++ "\n") ls
 
 {- | Pretty-print all the production rules associated with a symbol, in
      Backus-Naur form.
@@ -150,7 +151,7 @@ showProductionsBNF grammar sym = let header = showSymbol sym
 -- | Helper function to concatenate production rules in BNF form.
 joinProductionsBNF :: Grammar g => [[Repr g]] -> String
 joinProductionsBNF [] = ""
-joinProductionsBNF ps = foldr1 (\rule rest -> rule ++ " | " ++ rest) $ map showSentence ps
+joinProductionsBNF ps = foldr1 (\rule rest -> rule ++ " | " ++ rest) $ map showWord ps
 
 {- | Pretty-print all the production rules in a grammar.
 
@@ -171,7 +172,7 @@ joinProductionsBNF ps = foldr1 (\rule rest -> rule ++ " | " ++ rest) $ map showS
    I -> I3
 -}
 showGrammarWith :: (Grammar g, Show (Repr g))
-                => (g -> Repr g -> String)  -- ^ a function that shows a sentence
+                => (g -> Repr g -> String)  -- ^ a function that shows a word
                 -> g                        -- ^ the grammar
                 -> String                   -- ^ its pretty-printed representation as a String
 showGrammarWith showProds grammar = let syms = S.toList $ getNonTerminals grammar
@@ -257,7 +258,7 @@ as "is this symbol terminal?".
 For efficiency reasons, the 'CFG' datatype is built upon an 'IntCFG'.
 -}
 
-data IntCFG = IntCFG Label Label (IM.IntMap Sentences) deriving (Eq, Ord)
+data IntCFG = IntCFG Label Label (IM.IntMap Words) deriving (Eq, Ord)
 -- ^ The default constructor takes the next available label @n@, the label of
 -- the first nonterminal symbol and the 'Data.IntMap.IntMap' representing the
 -- production rules.
@@ -266,13 +267,13 @@ data IntCFG = IntCFG Label Label (IM.IntMap Sentences) deriving (Eq, Ord)
 type Label = Int
 
 -- | Type synonim for a sequence of 'Int's.
-type Sentence = Seq.Seq Int
+type Word = Seq.Seq Int
 
 -- | Type synonim for the collection of production rules associated to a given
 --   symbol.
-type Sentences = V.Vector Sentence
+type Words = V.Vector Word
 
-productionsInt :: IntCFG -> Label -> Sentences
+productionsInt :: IntCFG -> Label -> Words
 productionsInt (IntCFG _ _ prods) nt = let inMap = IM.lookup nt prods
                                         in fromMaybe V.empty inMap
 
@@ -311,24 +312,24 @@ invert = VU.ifoldr' (\i label inverse -> IM.insert label i inverse) IM.empty
 inverseRenumberLabel :: InverseRelabellingInt -> Label -> Label
 inverseRenumberLabel renumb label = renumb VU.! label
 
--- | Apply the inverse relabelling to a given 'Sentence'
-inverseRenumberSentence :: InverseRelabellingInt -> Sentence -> Sentence
-inverseRenumberSentence renumb = fmap (inverseRenumberLabel renumb)
+-- | Apply the inverse relabelling to a given 'Word'
+inverseRenumberWord :: InverseRelabellingInt -> Word -> Word
+inverseRenumberWord renumb = fmap (inverseRenumberLabel renumb)
 
 -- | Apply the relabelling to a given 'Label'
 renumberLabel :: RelabellingInt -> Label -> Label
 renumberLabel iRenumb label = fromJust $ IM.lookup label iRenumb
 
--- | Apply the relabelling to a given 'Sentence'
-renumberSentence :: RelabellingInt -> Sentence -> Sentence
-renumberSentence iRenumb = fmap (renumberLabel iRenumb)
+-- | Apply the relabelling to a given 'Word'
+renumberWord :: RelabellingInt -> Word -> Word
+renumberWord iRenumb = fmap (renumberLabel iRenumb)
 
 -- | Return all labels appearing in a set of (integer) production rules.
-collectLabels :: IM.IntMap Sentences -> IS.IntSet
+collectLabels :: IM.IntMap Words -> IS.IntSet
 collectLabels =
-    let insertSentences :: IS.IntSet -> Sentences -> IS.IntSet
-        insertSentences = V.foldr' (flip (foldr' IS.insert))
-     in IM.foldrWithKey (\key values set -> insertSentences (IS.insert key set) values) IS.empty
+    let insertWords :: IS.IntSet -> Words -> IS.IntSet
+        insertWords = V.foldr' (flip (foldr' IS.insert))
+     in IM.foldrWithKey (\key values set -> insertWords (IS.insert key set) values) IS.empty
 
 {- | Build an 'IntCFG' from an association list of @(nonterminal, productions)@
      pairs. The Labels appearing in the association list are renumbered to
@@ -336,14 +337,14 @@ collectLabels =
      is returned along with the built grammar, in the form of a
      'Data.Vector.Unboxed.Vector' 'Label' indexed by the renumbered labels.
 -}
-productionsToIntCFG :: Label -> [(Label, Sentences)] -> (IntCFG, InverseRelabellingInt, RelabellingInt)
+productionsToIntCFG :: Label -> [(Label, Words)] -> (IntCFG, InverseRelabellingInt, RelabellingInt)
 productionsToIntCFG start = intMapToIntCFG start . productionsToIntMap
 
 {- | Build an 'IntCFG' from an 'Data.IntMap.IntMap' between 'Label's. The
      'Labels' will be renumbered as specified in the second and third return
      values.
 -}
-intMapToIntCFG :: Label -> IM.IntMap Sentences -> (IntCFG, InverseRelabellingInt, RelabellingInt)
+intMapToIntCFG :: Label -> IM.IntMap Words -> (IntCFG, InverseRelabellingInt, RelabellingInt)
 intMapToIntCFG start intMap = let (intMap', inverseRelabelling, relabelling) = renumberMap start intMap
                                   maxLabel = VU.length inverseRelabelling - 1
                                   nNonTerms = IM.size intMap
@@ -357,8 +358,8 @@ intMapToIntCFG start intMap = let (intMap', inverseRelabelling, relabelling) = r
      'Data.IntMap.IntMap'.  The starting symbol is always renumbered as 0.
 -}
 renumberMap :: Label                -- ^ The label of the starting symbol
-            -> IM.IntMap Sentences -- ^ The map to renumber
-            -> (IM.IntMap Sentences, InverseRelabellingInt, RelabellingInt)
+            -> IM.IntMap Words -- ^ The map to renumber
+            -> (IM.IntMap Words, InverseRelabellingInt, RelabellingInt)
             -- ^ The renumbered map, the new-to-old mapping and the old-to-new mapping
 renumberMap start intMap =
     let allLabels = collectLabels intMap
@@ -368,14 +369,14 @@ renumberMap start intMap =
         inverseRelabelling = VU.fromList $ start : IS.toList nonTermsExceptStart ++ IS.toList terms
         relabelling = invert inverseRelabelling
         intMap' = IM.mapKeys (renumberLabel relabelling) intMap
-        intMap'' = fmap (fmap (renumberSentence relabelling)) intMap'
+        intMap'' = fmap (fmap (renumberWord relabelling)) intMap'
      in (intMap'', inverseRelabelling, relabelling)
 
 {- | Provide the fundamental building block to construct an 'IntCFG' from an
      association list of @(nonterminal, productions)@ pairs. The Labels are
      not guaranteed to span the @[0,n-1]@ range.
 -}
-productionsToIntMap :: [(Label, Sentences)] -> IM.IntMap Sentences
+productionsToIntMap :: [(Label, Words)] -> IM.IntMap Words
 productionsToIntMap = IM.fromList
 
 instance Grammar IntCFG where
@@ -438,20 +439,20 @@ unsafeToSymbol :: LabelToSymbolDict a -> Label -> a
 unsafeToSymbol dict label =  dict V.! label
 
 -- | Convert a string of symbols to a sequence of labels.
-symbolsToSentence :: Ord a => SymbolToLabelDict a -> [a] -> Sentence
-symbolsToSentence dict = Seq.fromList . map (unsafeToLabel dict)
+symbolsToWord :: Ord a => SymbolToLabelDict a -> [a] -> Word
+symbolsToWord dict = Seq.fromList . map (unsafeToLabel dict)
 
--- | Convert a list of symbol strings to a list of label sentences.
-symbolsToSentences :: Ord a => SymbolToLabelDict a -> [[a]] -> Sentences
-symbolsToSentences dict = V.fromList . map (symbolsToSentence dict)
+-- | Convert a list of symbol strings to a list of label words.
+symbolsToWords :: Ord a => SymbolToLabelDict a -> [[a]] -> Words
+symbolsToWords dict = V.fromList . map (symbolsToWord dict)
 
--- | Convert a list of labels (a sentence) to a string of symbols.
-sentenceToSymbols :: LabelToSymbolDict a -> Sentence -> [a]
-sentenceToSymbols dict = map (unsafeToSymbol dict) . toList
+-- | Convert a list of labels (a word) to a string of symbols.
+wordToSymbols :: LabelToSymbolDict a -> Word -> [a]
+wordToSymbols dict = map (unsafeToSymbol dict) . toList
 
--- | Convert a list of label sentences to a list of symbol strings.
-sentencesToSymbols :: LabelToSymbolDict a -> Sentences -> [[a]]
-sentencesToSymbols dict = V.toList . fmap (sentenceToSymbols dict)
+-- | Convert a list of label words to a list of symbol strings.
+wordsToSymbols :: LabelToSymbolDict a -> Words -> [[a]]
+wordsToSymbols dict = V.toList . fmap (wordToSymbols dict)
 
 -- | Extract all the symbols from an association list of production rules.
 gatherAllSymbols :: Ord a => [(a, [[a]])] -> S.Set a
@@ -464,14 +465,14 @@ gatherAllSymbols = foldr' insertKeyValue S.empty
      of labels, along with dictionaries to translate symbols to labels and
      vice-versa.
 -}
-labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Sentences)], LabelToSymbolDict a, SymbolToLabelDict a)
+labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Words)], LabelToSymbolDict a, SymbolToLabelDict a)
 labelAllSymbols kvs = let allSymbols = gatherAllSymbols kvs
                           labelsToSymbols = V.fromList $ S.toList allSymbols
                           symbolsToLabels = invertSymbolToLabelDict labelsToSymbols
                           labelledAssocList = labelKeyValues kvs symbolsToLabels
                        in (labelledAssocList, labelsToSymbols, symbolsToLabels)
 
-labelKeyValues :: Ord a => [(a, [[a]])] -> SymbolToLabelDict a -> [(Label, Sentences)]
+labelKeyValues :: Ord a => [(a, [[a]])] -> SymbolToLabelDict a -> [(Label, Words)]
 labelKeyValues kvs dict =
     let translate s = fromJust $ M.lookup s dict
      in map (\(k, vs) -> (translate k, V.fromList $ map (Seq.fromList . map translate) vs)) kvs
@@ -512,7 +513,7 @@ productionsCFG (CFG _ iGr s2l l2s) symbol =
     case toLabel s2l symbol of
         Nothing  -> []
         Just label -> let prodsInt = productionsInt iGr label
-                       in sentencesToSymbols l2s prodsInt
+                       in wordsToSymbols l2s prodsInt
 
 isInCFG :: Ord a => a -> CFG a -> Bool
 isInCFG c (CFG _ iGr s2l _) = case toLabel s2l c of
