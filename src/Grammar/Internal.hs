@@ -47,6 +47,7 @@ module Grammar.Internal
 -- * Context free grammars over alphabets of arbitrary types
 , CFG(..)
 , productionsToCFG
+, gatherAllSymbols
 , labelAllSymbols
 , toSymbol
 , toLabel
@@ -252,10 +253,10 @@ as "is this symbol terminal?".
 For efficiency reasons, the 'CFG' datatype is built upon an 'IntCFG'.
 -}
 
-data IntCFG = IntCFG Label  -- ^ The next available label @n@
-                     Label  -- ^ The label of the first nonterminal symbol.
-                     (IM.IntMap Sentences)
-                     deriving (Eq, Ord)
+data IntCFG = IntCFG Label Label (IM.IntMap Sentences) deriving (Eq, Ord)
+-- ^ The default constructor takes the next available label @n@, the label of
+-- the first nonterminal symbol and the 'Data.IntMap.IntMap' representing the
+-- production rules.
 
 -- | Type synonim for 'Int'.
 type Label = Int
@@ -263,6 +264,8 @@ type Label = Int
 -- | Type synonim for a sequence of 'Int's.
 type Sentence = Seq.Seq Int
 
+-- | Type synonim for the collection of production rules associated to a given
+--   symbol.
 type Sentences = V.Vector Sentence
 
 productionsInt :: IntCFG -> Label -> Sentences
@@ -447,8 +450,19 @@ sentenceToSymbols dict = map (unsafeToSymbol dict) . toList
 sentencesToSymbols :: Labelling a -> Sentences -> [[a]]
 sentencesToSymbols dict = V.toList . fmap (sentenceToSymbols dict)
 
+-- | Extract all the symbols from an association list of production rules.
+gatherAllSymbols :: Ord a => [(a, [[a]])] -> S.Set a
+gatherAllSymbols = foldr' insertKeyValue S.empty
+    where insertKeyValue :: Ord a => (a, [[a]]) -> S.Set a -> S.Set a
+          insertKeyValue (k, vs) set = foldr' S.insert (S.insert k set) $ concat vs
+
+{- | Given a list of production rules in the form of an association list,
+     associate a label to each mentioned symbol and return an association list
+     of labels, along with dictionaries to translate symbols to labels and
+     vice-versa.
+-}
 labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Sentences)], Labelling a, InverseLabelling a)
-labelAllSymbols kvs = let allSymbols = foldr' insertKeyValue S.empty kvs
+labelAllSymbols kvs = let allSymbols = gatherAllSymbols kvs
                           labelling = V.fromList $ S.toList allSymbols
                           inverseLabelling = invertLabelling labelling
                           labelledAssocList = renumberKeyValues kvs inverseLabelling
@@ -458,9 +472,6 @@ renumberKeyValues :: Ord a => [(a, [[a]])] -> InverseLabelling a -> [(Label, Sen
 renumberKeyValues kvs dict =
     let translate s = fromJust $ M.lookup s dict
      in map (\(k, vs) -> (translate k, V.fromList $ map (Seq.fromList . map translate) vs)) kvs
-
-insertKeyValue :: Ord a => (a, [[a]]) -> S.Set a -> S.Set a
-insertKeyValue (k, vs) set = foldr' S.insert (S.insert k set) $ concat vs
 
 -- | Invert an 'Int'-to-@a@ labelling.
 invertLabelling :: Ord a => Labelling a -> InverseLabelling a
