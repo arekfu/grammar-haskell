@@ -270,7 +270,7 @@ data IntCFG = IntCFG Label Label (IM.IntMap LabelStrings) deriving (Eq, Ord, Gen
 type Label = Int
 
 -- | Type synonim for a sequence of 'Int's.
-type LabelString = Seq.Seq Int
+type LabelString = Seq.Seq Label
 
 -- | Type synonim for the collection of production rules associated to a given
 --   symbol.
