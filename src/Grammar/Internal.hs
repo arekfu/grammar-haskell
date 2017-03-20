@@ -32,8 +32,8 @@ module Grammar.Internal
 , Label
 , LabelString
 , LabelStrings
-, InverseRelabellingInt
-, RelabellingInt
+, InverseRelabelling
+, Relabelling
 -- ** Manipulators
 , productionsToIntMap
 , intMapToIntCFG
@@ -300,29 +300,29 @@ getNonTerminalsInt :: IntCFG -> S.Set Label
 getNonTerminalsInt (IntCFG _ i _) =  S.fromDistinctAscList [0..i-1]
 
 -- | Type synonim for a 'Data.Vector.Unboxed.Vector' of 'Int's.
-type InverseRelabellingInt = VU.Vector Int
+type InverseRelabelling = VU.Vector Int
 
 -- | Type synonim for a 'Data.IntMap.IntMap' of 'Int's.
-type RelabellingInt = IM.IntMap Int
+type Relabelling = IM.IntMap Int
 
 -- | Invert an 'Int'-to-'Int' relabelling.
-invert :: InverseRelabellingInt -> RelabellingInt
+invert :: InverseRelabelling -> Relabelling
 invert = VU.ifoldr' (\i label inverse -> IM.insert label i inverse) IM.empty
 
 -- | Apply the inverse relabelling to a given 'Label'.
-inverseRenumberLabel :: InverseRelabellingInt -> Label -> Label
+inverseRenumberLabel :: InverseRelabelling -> Label -> Label
 inverseRenumberLabel renumb label = renumb VU.! label
 
 -- | Apply the inverse relabelling to a given 'LabelString'
-inverseRenumberLabels :: InverseRelabellingInt -> LabelString -> LabelString
+inverseRenumberLabels :: InverseRelabelling -> LabelString -> LabelString
 inverseRenumberLabels renumb = fmap (inverseRenumberLabel renumb)
 
 -- | Apply the relabelling to a given 'Label'
-renumberLabel :: RelabellingInt -> Label -> Label
+renumberLabel :: Relabelling -> Label -> Label
 renumberLabel iRenumb label = fromJust $ IM.lookup label iRenumb
 
 -- | Apply the relabelling to a given 'LabelString'
-renumberLabels :: RelabellingInt -> LabelString -> LabelString
+renumberLabels :: Relabelling -> LabelString -> LabelString
 renumberLabels iRenumb = fmap (renumberLabel iRenumb)
 
 -- | Return all labels appearing in a set of (integer) production rules.
@@ -338,14 +338,14 @@ collectLabels =
      is returned along with the built grammar, in the form of a
      'Data.Vector.Unboxed.Vector' 'Label' indexed by the renumbered labels.
 -}
-productionsToIntCFG :: Label -> [(Label, LabelStrings)] -> (IntCFG, InverseRelabellingInt, RelabellingInt)
+productionsToIntCFG :: Label -> [(Label, LabelStrings)] -> (IntCFG, InverseRelabelling, Relabelling)
 productionsToIntCFG start = intMapToIntCFG start . productionsToIntMap
 
 {- | Build an 'IntCFG' from an 'Data.IntMap.IntMap' between 'Label's. The
      'Labels' will be renumbered as specified in the second and third return
      values.
 -}
-intMapToIntCFG :: Label -> IM.IntMap LabelStrings -> (IntCFG, InverseRelabellingInt, RelabellingInt)
+intMapToIntCFG :: Label -> IM.IntMap LabelStrings -> (IntCFG, InverseRelabelling, Relabelling)
 intMapToIntCFG start intMap = let (intMap', inverseRelabelling, relabelling) = renumberMap start intMap
                                   maxLabel = VU.length inverseRelabelling - 1
                                   nNonTerms = IM.size intMap
@@ -354,13 +354,13 @@ intMapToIntCFG start intMap = let (intMap', inverseRelabelling, relabelling) = r
 {- | Renumber the @n@ integers that appear as keys and values of the map in
      such a way that they exactly span the @[0,n-1]@ interval. The
      correspondence between the new and the old numbering scheme
-     ('InverseRelabellingInt') is returned as a 'Data.Vector.Unboxed.Vector'.
+     ('InverseRelabelling') is returned as a 'Data.Vector.Unboxed.Vector'.
      The mapping in the other direction ('SymbolToLabelDict') is actually an
      'Data.IntMap.IntMap'.  The starting symbol is always renumbered as 0.
 -}
 renumberMap :: Label                    -- ^ The label of the starting symbol
             -> IM.IntMap LabelStrings   -- ^ The map to renumber
-            -> (IM.IntMap LabelStrings, InverseRelabellingInt, RelabellingInt)
+            -> (IM.IntMap LabelStrings, InverseRelabelling, Relabelling)
             -- ^ The renumbered map, the new-to-old mapping and the old-to-new mapping
 renumberMap start intMap =
     let allLabels = collectLabels intMap
@@ -486,7 +486,7 @@ labelKeyValues kvs dict =
 invertSymbolToLabelDict :: Ord a => LabelToSymbolDict a -> SymbolToLabelDict a
 invertSymbolToLabelDict = V.ifoldr' (\i sym inverse -> M.insert sym i inverse) M.empty
 
-relabel :: LabelToSymbolDict a -> InverseRelabellingInt -> LabelToSymbolDict a
+relabel :: LabelToSymbolDict a -> InverseRelabelling -> LabelToSymbolDict a
 relabel labelsToSymbolsDict inverseRelabelling =
     V.generate (V.length labelsToSymbolsDict) (\i -> labelsToSymbolsDict V.! (inverseRelabelling VU.! i))
 
