@@ -14,7 +14,6 @@ module Grammar
 (
 -- * The 'Grammar' typeclass
   Grammar(..)
-, pick
 -- ** Pretty-printing parts of a grammar
 -- $examplegrammar
 , showWord

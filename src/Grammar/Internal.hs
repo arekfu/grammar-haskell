@@ -18,7 +18,6 @@ module Grammar.Internal
 -- * The 'Grammar' typeclass
   Grammar(..)
 , allProductions
-, pick
 -- ** Pretty-printing parts of a grammar
 -- $examplegrammar
 , showWord
@@ -85,32 +84,52 @@ rule is represented by a list of labels. Alternative production rules
 associated with the same label are represented as lists of lists.
 -}
 class Grammar g where
+
     -- | The type of the elements of the alphabet described by the grammar @g@.
     data Repr g :: *
+
     -- | @productions gr sym@ returns the productions associated with label @sym@ in grammar @gr@.
     productions :: g -> Repr g -> [[Repr g]]
+
     -- | Convert a symbol to a 'String'.
     showSymbol :: Repr g -> String
+
     -- | Is this symbol part of the grammar?
     isInGrammar :: Repr g -> g -> Bool
     isInGrammar x gr = not $ isNotInGrammar x gr
+
     -- | Is this symbol part of the grammar?
     isNotInGrammar :: Repr g -> g -> Bool
     isNotInGrammar x gr = not $ isInGrammar x gr
+
     -- | Is this symbol a terminal?
     isTerminal :: Repr g -> g -> Bool
+
     -- | Is this symbol a nonterminal?
     isNonTerminal :: Repr g -> g -> Bool
+
     -- | Returns the set of all symbols used in the grammar
     getSymbols :: g -> S.Set (Repr g)
+
     -- | Returns the set of all terminals used in the grammar
     getTerminals :: g -> S.Set (Repr g)
     getTerminals g = S.filter (`isTerminal` g) $ getSymbols g
+
     -- | Returns the set of all nonterminals used in the grammar
     getNonTerminals :: g -> S.Set (Repr g)
     getNonTerminals g = S.filter (`isNonTerminal` g) $ getSymbols g
+
     -- | Returns the start symbol of the grammar
     startSymbol :: g -> Repr g
+
+    -- | Pick the @n@-th production rule associated with a given symbol. WARNING:
+    --   unsafe if @n@ is out of bounds.
+    pick :: Int         -- ^ @n@, the rank of the selected rule
+         -> g           -- ^ the grammar
+         -> Repr g      -- ^ the nonterminal
+         -> [Repr g]    -- ^ the associated production rule
+    pick n grammar sym = productions grammar sym !! n
+
 
 -- | Pretty-print a word (a sequence of symbols).
 showWord :: Grammar g
@@ -212,16 +231,6 @@ showGrammarBNF = showGrammarWith showProductionsBNF
 ------------------------------------
 --  generic grammar manipulators  --
 ------------------------------------
-
-
--- | Pick the @n@-th production rule associated with a given symbol. WARNING:
---   unsafe if @n@ is out of bounds.
-pick :: Grammar g
-     => Int         -- ^ @n@, the rank of the selected rule
-     -> g           -- ^ the grammar
-     -> Repr g      -- ^ the nonterminal
-     -> [Repr g]    -- ^ the associated production rule
-pick n grammar sym = productions grammar sym !! n
 
 
 -- | Represent all grammar production rules as an association list
