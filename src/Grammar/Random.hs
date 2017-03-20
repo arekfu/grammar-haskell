@@ -25,11 +25,9 @@ module Grammar.Random
 , Seed
 , evalGrammar
 -- * Randomly expanding symbols and words
+, RandomGrammar(..)
 , randomSymExpand
 , randomWordExpand
-, randomWordDerive
-, randomWordDeriveN
-, randomWordDeriveScan
 , randomGrammarDerive
 , randomGrammarDeriveN
 , randomGrammarDeriveScan
@@ -102,6 +100,46 @@ pickRandom set = let l = toList set
                   in do ran <- uniformInt 0 (n-1)
                         return $ l !! ran
 
+---------------------------------------------------------
+--  functions to randomly derive sequences of symbols  --
+---------------------------------------------------------
+
+class (Grammar g, Ord (Repr g)) => RandomGrammar g where
+
+    -- | Recursively and randomly expand a word until it consists solely of
+    --   terminals. WARNING: may produce infinite lists!
+    randomWordDerive :: g           -- ^ the grammar
+                     -> [Repr g]    -- ^ the word to expand
+                     -> MC [Repr g] -- ^ a fully expanded sequence of terminals
+    randomWordDerive grammar word =
+        do expanded <- randomWordExpand grammar word
+           if word == expanded
+           then return expanded
+           else randomWordDerive grammar expanded
+
+    -- | Recursively and randomly expand a word until it consists solely of
+    --   terminals or until @n@ expansion steps have been performed, whichever
+    --   comes first.
+    randomWordDeriveN :: Int            -- ^ the maximum number of expansions
+                      -> g              -- ^ the grammar
+                      -> [Repr g]       -- ^ the starting word
+                      -> MC [Repr g]    -- ^ the resulting expansion
+    randomWordDeriveN 0 _ word = return word
+    randomWordDeriveN n grammar word = do expanded <- randomWordDerive grammar word
+                                          randomWordDeriveN (n-1) grammar expanded
+
+    -- | Recursively and randomly expand a word, and return all the
+    --   intermediate expansion results. WARNING: may produce infinite lists!
+    randomWordDeriveScan :: g               -- ^ the grammar
+                         -> [Repr g]        -- ^ the starting word
+                         -> MC [[Repr g]]   -- ^ the list of all intermediate expansions
+    randomWordDeriveScan grammar word =
+        do expanded <- randomWordExpand grammar word
+           if word == expanded
+           then return [expanded]
+           else fmap (expanded:) (randomWordDeriveScan grammar expanded)
+
+
 -- | Randomly expand a symbol using one of its production rules.
 randomSymExpand :: (Grammar g, Ord (Repr g))
                 => g            -- ^ the grammar
@@ -109,7 +147,7 @@ randomSymExpand :: (Grammar g, Ord (Repr g))
                 -> MC [Repr g]  -- ^ the resulting word
 randomSymExpand gr sym = case productions gr sym of
                                 [] -> return [sym]
-                                words  -> pickRandom words
+                                words -> pickRandom words
 
 -- | Expand a word (a sequence of symbols) using randomly selected
 --   production rules for each nonterminal.
@@ -120,45 +158,9 @@ randomWordExpand :: (Grammar g, Ord (Repr g))
 randomWordExpand g syms = do words <- mapM (randomSymExpand g) syms
                              return $ concat words
 
--- | Recursively and randomly expand a word until it consists solely of
---   terminals. WARNING: may produce infinite lists!
-randomWordDerive :: (Grammar g, Ord (Repr g))
-                 => g           -- ^ the grammar
-                 -> [Repr g]    -- ^ the word to expand
-                 -> MC [Repr g] -- ^ a fully expanded sequence of terminals
-randomWordDerive grammar word =
-    do expanded <- randomWordExpand grammar word
-       if word == expanded
-       then return expanded
-       else randomWordDerive grammar expanded
-
--- | Recursively and randomly expand a word until it consists solely of
---   terminals or until @n@ expansion steps have been performed, whichever
---   comes first.
-randomWordDeriveN :: (Grammar g, Ord (Repr g))
-                  => Int            -- ^ the maximum number of expansions
-                  -> g              -- ^ the grammar
-                  -> [Repr g]       -- ^ the starting word
-                  -> MC [Repr g]    -- ^ the resulting expansion
-randomWordDeriveN 0 _ word = return word
-randomWordDeriveN n grammar word = do expanded <- randomWordDerive grammar word
-                                      randomWordDeriveN (n-1) grammar expanded
-
--- | Recursively and randomly expand a word, and return all the
---   intermediate expansion results. WARNING: may produce infinite lists!
-randomWordDeriveScan :: (Grammar g, Ord (Repr g))
-                     => g               -- ^ the grammar
-                     -> [Repr g]        -- ^ the starting word
-                     -> MC [[Repr g]]   -- ^ the list of all intermediate expansions
-randomWordDeriveScan grammar word =
-    do expanded <- randomWordExpand grammar word
-       if word == expanded
-       then return [expanded]
-       else fmap (expanded:) (randomWordDeriveScan grammar expanded)
-
 -- | Recursively and randomly expand the start symbol of a grammar until it
 --   consists solely of terminals. WARNING: may produce infinite lists!
-randomGrammarDerive :: (Grammar g, Ord (Repr g))
+randomGrammarDerive :: (RandomGrammar g, Ord (Repr g))
                     => g           -- ^ the grammar
                     -> MC [Repr g] -- ^ a fully expanded sequence of terminals
 randomGrammarDerive grammar = randomWordDerive grammar [startSymbol grammar]
@@ -166,7 +168,7 @@ randomGrammarDerive grammar = randomWordDerive grammar [startSymbol grammar]
 -- | Recursively and randomly expand the start symbol of a grammar until it
 --   consists solely of terminals or until @n@ expansion steps have been
 --   performed, whichever comes first.
-randomGrammarDeriveN :: (Grammar g, Ord (Repr g))
+randomGrammarDeriveN :: (RandomGrammar g, Ord (Repr g))
                      => Int            -- ^ the maximum number of expansions
                      -> g              -- ^ the grammar
                      -> MC [Repr g]    -- ^ the resulting expansion
@@ -175,7 +177,12 @@ randomGrammarDeriveN n grammar = randomWordDeriveN n grammar [startSymbol gramma
 -- | Recursively and randomly expand the start symbol of a grammar, and return
 --   all the intermediate expansion results. WARNING: may produce infinite
 --   lists!
-randomGrammarDeriveScan :: (Grammar g, Ord (Repr g))
+randomGrammarDeriveScan :: (RandomGrammar g, Ord (Repr g))
                         => g               -- ^ the grammar
                         -> MC [[Repr g]]   -- ^ the list of all intermediate expansions
 randomGrammarDeriveScan grammar = randomWordDeriveScan grammar [startSymbol grammar]
+
+instance RandomGrammar IntCFG
+instance (Ord a, Show a) => RandomGrammar (CFG a)
+instance RandomGrammar CharCFG
+instance RandomGrammar StringCFG
