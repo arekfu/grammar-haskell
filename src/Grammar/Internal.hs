@@ -153,26 +153,13 @@ joinProductionsBNF :: Grammar g => [[Repr g]] -> String
 joinProductionsBNF [] = ""
 joinProductionsBNF ps = foldr1 (\rule rest -> rule ++ " | " ++ rest) $ map showWord ps
 
-{- | Pretty-print all the production rules in a grammar.
-
-   >>> putStrLn $ showGrammar exampleGrammar
-   E -> E+E
-   E -> E*E
-   E -> (E)
-   E -> I
-   I -> a
-   I -> b
-   I -> c
-   I -> Ia
-   I -> Ib
-   I -> Ic
-   I -> I0
-   I -> I1
-   I -> I2
-   I -> I3
+{- | Pretty-print all the production rules in a grammar using an external
+     function to display lists of production rules.
 -}
 showGrammarWith :: (Grammar g, Show (Repr g))
-                => (g -> Repr g -> String)  -- ^ a function that shows a word
+                => (g -> Repr g -> String)  -- ^ a function that knows how to
+                                            --   display production rules
+                                            --   associated with a given symbol
                 -> g                        -- ^ the grammar
                 -> String                   -- ^ its pretty-printed representation as a String
 showGrammarWith showProds grammar = let syms = S.toList $ getNonTerminals grammar
