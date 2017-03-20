@@ -367,7 +367,7 @@ productionsToIntMap :: [(Label, Words)] -> IM.IntMap Words
 productionsToIntMap = IM.fromList
 
 instance Grammar IntCFG where
-    data Repr IntCFG = ReprInt Label deriving (Eq, Ord, Show)
+    data Repr IntCFG = ReprInt { unReprInt :: Label } deriving (Eq, Ord, Show)
     -- all the instance declarations do is actually wrap and unwrap the Repr
     -- datatype
     productions g (ReprInt sym) = toList $ (fmap ReprInt . toList) <$> productionsInt g sym
@@ -540,7 +540,7 @@ startSymbolCFG :: CFG a -> a
 startSymbolCFG (CFG start _ _ _) = start
 
 instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
-    data Repr (CFG a) = ReprCFG a deriving (Eq, Ord, Show)
+    data Repr (CFG a) = ReprCFG { unReprCFG :: a } deriving (Eq, Ord, Show)
     productions grammar (ReprCFG s) = map (map ReprCFG) $ productionsCFG grammar s
     showSymbol = show
     isInGrammar (ReprCFG s) = isInCFG s
@@ -567,7 +567,7 @@ instance (Ord a, Show a) => Show (CFG a) where show = showGrammarBNF
 newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord)
 
 instance Grammar CharCFG where
-    data Repr CharCFG = ReprChar Char deriving (Eq, Ord, Show)
+    data Repr CharCFG = ReprChar { unReprChar :: Char } deriving (Eq, Ord, Show)
     productions (CharCFG g) (ReprChar c) = map (map ReprChar) $ productionsCFG g c
     showSymbol (ReprChar s) = [s]
     isInGrammar (ReprChar s) (CharCFG g) = isInCFG s g
@@ -597,7 +597,7 @@ instance Show CharCFG where show = showGrammarBNF
 newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord)
 
 instance Grammar StringCFG where
-    data Repr StringCFG = ReprString String deriving (Eq, Ord, Show)
+    data Repr StringCFG = ReprString { unReprString :: String } deriving (Eq, Ord, Show)
     productions (StringCFG g) (ReprString s) = map (map ReprString) $ productionsCFG g s
     showSymbol (ReprString s) = s
     isInGrammar (ReprString s) (StringCFG g)= isInCFG s g
