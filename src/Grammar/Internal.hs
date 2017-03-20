@@ -17,6 +17,7 @@ module Grammar.Internal
 (
 -- * The 'Grammar' typeclass
   Grammar(..)
+, allProductions
 , pick
 -- ** Pretty-printing parts of a grammar
 -- $examplegrammar
@@ -222,6 +223,11 @@ pick :: Grammar g
      -> [Repr g]    -- ^ the associated production rule
 pick n grammar sym = productions grammar sym !! n
 
+
+-- | Represent all grammar production rules as an association list
+allProductions :: Grammar g => g -> [(Repr g, [Repr g])]
+allProductions g = let nonterms = toList $ getNonTerminals g
+                    in zip nonterms $ concatMap (productions g) nonterms
 
 
 ---------------------------------------
