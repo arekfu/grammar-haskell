@@ -93,7 +93,8 @@ prop_collectLabelsInclusion intMapA =
         _labels = collectLabels intMap
         keys = IM.keysSet intMap
         values = IM.elems intMap
-     in keys `IS.isSubsetOf` _labels .&&. all (\v -> all (\s -> all (\sym -> sym `IS.member` _labels) s) v) values
+     in keys `IS.isSubsetOf` _labels
+        .&&. all (all (all (`IS.member` _labels))) values
 
 -- | The renumbering must conserve the number of rules and the number of
 --   labels.
