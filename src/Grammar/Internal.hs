@@ -454,7 +454,7 @@ labelsToSymbols dict = map (unsafeToSymbol dict)
 
 -- | Convert a list of label words to a list of symbol strings.
 labelListsToSymbols :: LabelToSymbolDict a -> [[Label]] -> [[a]]
-labelListsToSymbols dict = fmap (labelsToSymbols dict)
+labelListsToSymbols dict = map (labelsToSymbols dict)
 
 -- | Extract all the symbols from an association list of production rules.
 gatherAllSymbols :: Ord a => [(a, [[a]])] -> S.Set a
