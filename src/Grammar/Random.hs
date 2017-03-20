@@ -16,7 +16,7 @@ equal probability. Depending on the grammar, this may lead the size of the
 generated word to grow without bound, or to become very large.
 -}
 
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, RankNTypes #-}
 
 module Grammar.Random
 (
@@ -182,7 +182,57 @@ randomGrammarDeriveScan :: (RandomGrammar g, Ord (Repr g))
                         -> MC [[Repr g]]   -- ^ the list of all intermediate expansions
 randomGrammarDeriveScan grammar = randomWordDeriveScan grammar [startSymbol grammar]
 
+delegateCFGToIntCFG :: Ord b
+                    => (forall g. RandomGrammar g => g -> [Repr g] -> MC ([Repr g]))
+                    -> CFG b
+                    -> [Repr (CFG b)]
+                    -> MC [Repr (CFG b)]
+delegateCFGToIntCFG action (CFG _ iGr s2l l2s) word =
+    let labelWord = map ReprInt $ symbolsToLabels s2l $ map unReprCFG word
+     in do derived <- action iGr labelWord
+           return $ map ReprCFG $ labelsToSymbols l2s $ map unReprInt derived
+
+delegateCFGToIntCFG2 :: Ord b
+                     => (forall g. RandomGrammar g => g -> [Repr g] -> MC ([[Repr g]]))
+                     -> CFG b
+                     -> [Repr (CFG b)]
+                     -> MC [[Repr (CFG b)]]
+delegateCFGToIntCFG2 action (CFG _ iGr s2l l2s) word =
+    let labelWord = map ReprInt $ symbolsToLabels s2l $ map unReprCFG word
+     in do derived <- action iGr labelWord
+           return $ map (map ReprCFG) $ map (labelsToSymbols l2s) $ map (map unReprInt) derived
+
 instance RandomGrammar IntCFG
-instance (Ord a, Show a) => RandomGrammar (CFG a)
-instance RandomGrammar CharCFG
-instance RandomGrammar StringCFG
+
+instance (Ord a, Show a) => RandomGrammar (CFG a) where
+    randomWordDerive grammar word = delegateCFGToIntCFG randomWordDerive grammar word
+    randomWordDeriveN n grammar word = delegateCFGToIntCFG (randomWordDeriveN n) grammar word
+    randomWordDeriveScan grammar word = delegateCFGToIntCFG2 randomWordDeriveScan grammar word
+
+instance RandomGrammar CharCFG where
+    randomWordDerive (CharCFG g) word =
+        map (ReprChar . unReprCFG)
+            <$> (delegateCFGToIntCFG randomWordDerive g
+                $ map (ReprCFG . unReprChar) word)
+    randomWordDeriveN n (CharCFG g) word =
+        map (ReprChar . unReprCFG)
+            <$> (delegateCFGToIntCFG (randomWordDeriveN n) g
+                $ map (ReprCFG . unReprChar) word)
+    randomWordDeriveScan (CharCFG g) word =
+        map (map (ReprChar . unReprCFG))
+            <$> (delegateCFGToIntCFG2 randomWordDeriveScan g
+                $ map (ReprCFG . unReprChar) word)
+
+instance RandomGrammar StringCFG where
+    randomWordDerive (StringCFG g) word =
+        map (ReprString . unReprCFG)
+            <$> (delegateCFGToIntCFG randomWordDerive g
+                $ map (ReprCFG . unReprString) word)
+    randomWordDeriveN n (StringCFG g) word =
+        map (ReprString . unReprCFG)
+            <$> (delegateCFGToIntCFG (randomWordDeriveN n) g
+                $ map (ReprCFG . unReprString) word)
+    randomWordDeriveScan (StringCFG g) word =
+        map (map (ReprString . unReprCFG))
+            <$> (delegateCFGToIntCFG2 randomWordDeriveScan g
+                $ map (ReprCFG . unReprString) word)
