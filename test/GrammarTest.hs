@@ -7,7 +7,7 @@ module GrammarTest
 ) where
 
 -- system imports
-import Prelude hiding (Word)
+import Prelude hiding (Word, words)
 import Test.QuickCheck
 import qualified Data.IntMap as IM
 import qualified Data.Vector.Unboxed as VU
@@ -46,9 +46,9 @@ instance Arbitrary AWord where
 
 newtype AWords = AWords Words deriving (Eq, Ord, Show)
 instance Arbitrary AWords where
-    arbitrary = do asents <- listOf1 arbitrary :: Gen [AWord]
-                   let sents = coerce asents
-                   return $ AWords (V.fromList sents)
+    arbitrary = do awords <- listOf1 arbitrary :: Gen [AWord]
+                   let words = coerce awords
+                   return $ AWords (V.fromList words)
 
 newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
 instance Arbitrary AIntCFG where
@@ -85,8 +85,8 @@ instance Arbitrary ACharCFG where
 --  some properties to test the functions that manipulate IntMaps, IntSets, etc.  --
 ------------------------------------------------------------------------------------
 
--- | All the map keys (nonterminals) and all the element of the sententials
---   must be found as labels.
+-- | All the map keys (nonterminals) and all the element of the words must be
+--   found as labels.
 prop_collectLabelsInclusion :: IM.IntMap AWords -> Property
 prop_collectLabelsInclusion intMapA =
     let intMap = coerce intMapA

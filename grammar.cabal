@@ -1,6 +1,6 @@
 name:                grammar
 version:             0.1.0.0
-synopsis:            Context-free grammars and random sentence generation.
+synopsis:            Context-free grammars and random word generation.
 description:         See README.md.
 homepage:            https://github.com/arekfu/grammar#readme
 license:             BSD3

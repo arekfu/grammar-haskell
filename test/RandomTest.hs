@@ -5,6 +5,7 @@ module RandomTest
 ) where
 
 -- system imports
+import Prelude hiding (words)
 import Data.Foldable (all, toList)
 import Test.QuickCheck
 
@@ -13,9 +14,9 @@ import Grammar.Internal
 import Grammar.Random
 import GrammarTest (ACharCFG(..))
 
--- | Generator of random sentences given an alphabet
-sentences :: [a] -> Gen [a]
-sentences syms = listOf1 $ elements syms
+-- | Generator of random words given an alphabet
+words :: [a] -> Gen [a]
+words syms = listOf1 $ elements syms
 
 -- | Terminals must not be expanded by the grammar rules
 prop_terminalsAreInvariant :: ACharCFG -> Seed -> Bool
@@ -23,12 +24,12 @@ prop_terminalsAreInvariant (ACharCFG g) seed =
     let terms = getTerminals g
      in all (\sym -> evalGrammar (randomSymExpand g sym) seed == [sym]) terms
 
--- | Deriving a sentence for 0 steps must be the identity
-prop_deriveSent0IsId :: ACharCFG -> Seed -> Property
-prop_deriveSent0IsId (ACharCFG g) seed =
+-- | Deriving a word for 0 steps must be the identity
+prop_deriveWord0IsId :: ACharCFG -> Seed -> Property
+prop_deriveWord0IsId (ACharCFG g) seed =
     let syms = toList $ getSymbols g
-     in not (null syms) ==> forAll (sentences syms) $ \sent ->
-            evalGrammar (randomSentDeriveN 0 g sent) seed === sent
+     in not (null syms) ==> forAll (words syms) $ \word ->
+            evalGrammar (randomWordDeriveN 0 g word) seed === word
 
 -- | Deriving the starting symbol for 0 steps must be the identity
 prop_deriveGrammar0IsId :: ACharCFG -> Seed -> Property
