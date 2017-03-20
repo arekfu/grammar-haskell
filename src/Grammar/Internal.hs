@@ -54,10 +54,10 @@ module Grammar.Internal
 , toLabel
 , unsafeToSymbol
 , unsafeToLabel
-, symbolsToWord
-, symbolsToWords
-, wordToSymbols
-, wordsToSymbols
+, symbolsToLabels
+, symbolsToLabelLists
+, labelsToSymbols
+, labelListsToSymbols
 -- * Context-free grammars over alphabets of specific types
 , CharCFG(..)
 , productionsToCharCFG
@@ -426,20 +426,20 @@ unsafeToSymbol :: LabelToSymbolDict a -> Label -> a
 unsafeToSymbol dict label =  dict V.! label
 
 -- | Convert a string of symbols to a sequence of labels.
-symbolsToWord :: Ord a => SymbolToLabelDict a -> [a] -> Word
-symbolsToWord dict = Seq.fromList . map (unsafeToLabel dict)
+symbolsToLabels :: Ord a => SymbolToLabelDict a -> [a] -> [Label]
+symbolsToLabels dict = map (unsafeToLabel dict)
 
 -- | Convert a list of symbol strings to a list of label words.
-symbolsToWords :: Ord a => SymbolToLabelDict a -> [[a]] -> Words
-symbolsToWords dict = V.fromList . map (symbolsToWord dict)
+symbolsToLabelLists :: Ord a => SymbolToLabelDict a -> [[a]] -> [[Label]]
+symbolsToLabelLists dict = map (symbolsToLabels dict)
 
 -- | Convert a list of labels (a word) to a string of symbols.
-wordToSymbols :: LabelToSymbolDict a -> Word -> [a]
-wordToSymbols dict = map (unsafeToSymbol dict) . toList
+labelsToSymbols :: LabelToSymbolDict a -> [Label] -> [a]
+labelsToSymbols dict = map (unsafeToSymbol dict)
 
 -- | Convert a list of label words to a list of symbol strings.
-wordsToSymbols :: LabelToSymbolDict a -> Words -> [[a]]
-wordsToSymbols dict = V.toList . fmap (wordToSymbols dict)
+labelListsToSymbols :: LabelToSymbolDict a -> [[Label]] -> [[a]]
+labelListsToSymbols dict = fmap (labelsToSymbols dict)
 
 -- | Extract all the symbols from an association list of production rules.
 gatherAllSymbols :: Ord a => [(a, [[a]])] -> S.Set a
@@ -454,10 +454,10 @@ gatherAllSymbols = foldr' insertKeyValue S.empty
 -}
 labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Words)], LabelToSymbolDict a, SymbolToLabelDict a)
 labelAllSymbols kvs = let allSymbols = gatherAllSymbols kvs
-                          labelsToSymbols = V.fromList $ S.toList allSymbols
-                          symbolsToLabels = invertSymbolToLabelDict labelsToSymbols
-                          labelledAssocList = labelKeyValues kvs symbolsToLabels
-                       in (labelledAssocList, labelsToSymbols, symbolsToLabels)
+                          labelsToSymbolsDict = V.fromList $ S.toList allSymbols
+                          symbolsToLabelsDict = invertSymbolToLabelDict labelsToSymbolsDict
+                          labelledAssocList = labelKeyValues kvs symbolsToLabelsDict
+                       in (labelledAssocList, labelsToSymbolsDict, symbolsToLabelsDict)
 
 labelKeyValues :: Ord a => [(a, [[a]])] -> SymbolToLabelDict a -> [(Label, Words)]
 labelKeyValues kvs dict =
@@ -469,8 +469,8 @@ invertSymbolToLabelDict :: Ord a => LabelToSymbolDict a -> SymbolToLabelDict a
 invertSymbolToLabelDict = V.ifoldr' (\i sym inverse -> M.insert sym i inverse) M.empty
 
 relabel :: LabelToSymbolDict a -> InverseRelabellingInt -> LabelToSymbolDict a
-relabel labelsToSymbols inverseRelabelling =
-    V.generate (V.length labelsToSymbols) (\i -> labelsToSymbols V.! (inverseRelabelling VU.! i))
+relabel labelsToSymbolsDict inverseRelabelling =
+    V.generate (V.length labelsToSymbolsDict) (\i -> labelsToSymbolsDict V.! (inverseRelabelling VU.! i))
 
 {- | Build a 'CFG' from an association list of @(nonterminal, productions)@
      pairs. Here a production is a list of lists of labels.
@@ -488,19 +488,19 @@ relabel labelsToSymbols inverseRelabelling =
 -}
 productionsToCFG :: (Ord a, Show a) => a -> [(a, [[a]])] -> CFG a
 productionsToCFG start kvs =
-    let (ikvs, labelsToSymbols, symbolsToLabels) = labelAllSymbols kvs
-        startLabel = fromJust $ M.lookup start symbolsToLabels
+    let (ikvs, labelsToSymbolsDict, symbolsToLabelsDict) = labelAllSymbols kvs
+        startLabel = fromJust $ M.lookup start symbolsToLabelsDict
         (intCFG, inverseRelabelling, _) = productionsToIntCFG startLabel ikvs
-        labelsToSymbols' = relabel labelsToSymbols inverseRelabelling
-        symbolsToLabels' = invertSymbolToLabelDict labelsToSymbols'
-     in CFG start intCFG symbolsToLabels' labelsToSymbols'
+        labelsToSymbolsDict' = relabel labelsToSymbolsDict inverseRelabelling
+        symbolsToLabelsDict' = invertSymbolToLabelDict labelsToSymbolsDict'
+     in CFG start intCFG symbolsToLabelsDict' labelsToSymbolsDict'
 
 productionsCFG :: Ord a => CFG a -> a -> [[a]]
 productionsCFG (CFG _ iGr s2l l2s) symbol =
     case toLabel s2l symbol of
         Nothing  -> []
         Just label -> let prodsInt = productionsInt iGr label
-                       in wordsToSymbols l2s prodsInt
+                       in labelListsToSymbols l2s $ toList (V.map toList prodsInt)
 
 isInCFG :: Ord a => a -> CFG a -> Bool
 isInCFG c (CFG _ iGr s2l _) = case toLabel s2l c of

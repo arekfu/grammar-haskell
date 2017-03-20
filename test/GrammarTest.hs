@@ -111,8 +111,8 @@ prop_renumber start intMapA = start `IM.member` intMapA ==>
 
 prop_labelAllSymbols :: [(Char, [String])] -> Property
 prop_labelAllSymbols kvs =
-    let (_, labelsToSymbols, symbolsToLabels) = labelAllSymbols kvs
-        in V.length labelsToSymbols === M.size symbolsToLabels
+    let (_, labelsToSymbolsDict, symbolsToLabelsDict) = labelAllSymbols kvs
+        in V.length labelsToSymbolsDict === M.size symbolsToLabelsDict
 
 -----------------------------------------
 --  now some properties about IntCFGs  --
