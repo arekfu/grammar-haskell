@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveAnyClass #-}
 
 module GrammarTest
 ( runTests
@@ -16,6 +16,8 @@ import qualified Data.Vector as V
 import qualified Data.Map as M
 import qualified Data.Sequence as Seq
 import Data.Coerce
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 -- local imports
 import Grammar.Internal
@@ -49,7 +51,7 @@ instance Arbitrary ALabelStrings where
                    let strings = coerce astrings
                    return $ ALabelStrings (V.fromList strings)
 
-newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
+newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show, Generic, NFData)
 instance Arbitrary AIntCFG where
     arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, ALabelStrings)]
                    let kvs = coerce akvs
@@ -67,7 +69,7 @@ instance Show NonTerminal where show (NonTerminal c) = [c]
 instance Arbitrary NonTerminal where
     arbitrary = NonTerminal <$> elements ['A'..'Z']
 
-newtype ACharCFG = ACharCFG CharCFG deriving (Show, Eq)
+newtype ACharCFG = ACharCFG CharCFG deriving (Show, Eq, Generic, NFData)
 instance Arbitrary ACharCFG where
     arbitrary = do Positive (Small terminalsSize) <- arbitrary :: Gen (Positive (Small Int))
                    Positive (Small nonTerminalsSize) <- arbitrary :: Gen (Positive (Small Int))

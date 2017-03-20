@@ -11,7 +11,7 @@ This module contains the most important datatypes of the package and the
 functions that operate on them.
 -}
 
-{-# LANGUAGE TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies, FlexibleContexts, DeriveGeneric, DeriveAnyClass #-}
 
 module Grammar.Internal
 (
@@ -75,6 +75,8 @@ import Data.Foldable (foldr', foldr1, toList)
 import qualified Data.Vector as V
 import qualified Data.Sequence as Seq
 import qualified Data.Vector.Unboxed as VU
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 
 
 {- |
@@ -259,7 +261,7 @@ as "is this symbol terminal?".
 For efficiency reasons, the 'CFG' datatype is built upon an 'IntCFG'.
 -}
 
-data IntCFG = IntCFG Label Label (IM.IntMap LabelStrings) deriving (Eq, Ord)
+data IntCFG = IntCFG Label Label (IM.IntMap LabelStrings) deriving (Eq, Ord, Generic, NFData)
 -- ^ The default constructor takes the next available label @n@, the label of
 -- the first nonterminal symbol and the 'Data.IntMap.IntMap' representing the
 -- production rules.
@@ -417,7 +419,7 @@ represented by a 'Data.Vector.Vector', because labels are guaranteed to span a
 continuous range starting at @0@ (see 'IntCFG').
 -}
 data CFG a = CFG a IntCFG (SymbolToLabelDict a) (LabelToSymbolDict a)
-             deriving (Eq, Ord)
+             deriving (Eq, Ord, Generic, NFData)
 
 type LabelToSymbolDict a = V.Vector a
 type SymbolToLabelDict a = M.Map a Label
@@ -590,7 +592,7 @@ instance (Ord a, Show a) => Show (CFG a) where show = showGrammarBNF
      >>> putStrLn $ showGrammar (productionsToCharCFG [('A', ["a"])])
      A := a
 -}
-newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord)
+newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord, Generic, NFData)
 
 instance Grammar CharCFG where
     data Repr CharCFG = ReprChar { unReprChar :: Char } deriving (Eq, Ord, Show)
@@ -621,7 +623,7 @@ instance Show CharCFG where show = showGrammarBNF
      >>> putStrLn $ showGrammar (productionsToStringCFG [("NONTERM", [["term"]])])
      NONTERM := term
 -}
-newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord)
+newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord, Generic, NFData)
 
 instance Grammar StringCFG where
     data Repr StringCFG = ReprString { unReprString :: String } deriving (Eq, Ord, Show)
