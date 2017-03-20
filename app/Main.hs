@@ -17,14 +17,14 @@ exampleGrammar :: CharCFG
 exampleGrammar = productionsToCharCFG 'E' exampleKeyValue
 
 digitsKeyValue :: [(String, [[String]])]
-digitsKeyValue = [ ("S", [["-", "FN"], ["FN"]])
-                 , ("FN", [["DL"], ["DL", ".", "DL"]])
-                 , ("DL", [["D"], ["D", "DL"]])
-                 , ("D", [["0"], ["1"], ["2"], ["3"], ["4"], ["5"], ["6"], ["7"], ["8"], ["9"]])
+digitsKeyValue = [ ("<S>", [["-", "<FN>"], ["<FN>"]])
+                 , ("<FN>", [["<DL>"], ["<DL>", ".", "<DL>"]])
+                 , ("<DL>", [["<D>"], ["<D>", "<DL>"]])
+                 , ("<D>", [["0"], ["1"], ["2"], ["3"], ["4"], ["5"], ["6"], ["7"], ["8"], ["9"]])
                  ]
 
 digitsGrammar :: StringCFG
-digitsGrammar = productionsToStringCFG "S" digitsKeyValue
+digitsGrammar = productionsToStringCFG "<S>" digitsKeyValue
 
 main :: IO ()
 main = do print exampleGrammar
