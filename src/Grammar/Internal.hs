@@ -558,6 +558,13 @@ getNonTerminalsCFG (CFG _ iGr _ l2s) = let labels = getNonTerminalsInt iGr
 startSymbolCFG :: CFG a -> a
 startSymbolCFG (CFG start _ _ _) = start
 
+pickCFG :: Ord a => Int -> CFG a -> a -> [a]
+pickCFG n (CFG _ iGr s2l l2s) sym =
+    let label = toLabel s2l sym
+     in case label of
+            Nothing -> []
+            Just l -> map (unsafeToSymbol l2s) $ toList $ productionsInt iGr l V.! n
+
 instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     data Repr (CFG a) = ReprCFG { unReprCFG :: a } deriving (Eq, Ord, Show)
     productions grammar (ReprCFG s) = map (map ReprCFG) $ productionsCFG grammar s
@@ -570,6 +577,7 @@ instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     getTerminals = S.map ReprCFG . getTerminalsCFG
     getNonTerminals = S.map ReprCFG . getNonTerminalsCFG
     startSymbol = ReprCFG . startSymbolCFG
+    pick n g (ReprCFG sym) = map ReprCFG $ pickCFG n g sym
 
 instance (Ord a, Show a) => Show (CFG a) where show = showGrammarBNF
 
@@ -597,6 +605,7 @@ instance Grammar CharCFG where
     getTerminals (CharCFG g) = S.map ReprChar $ getTerminalsCFG g
     getNonTerminals (CharCFG g) = S.map ReprChar $ getNonTerminalsCFG g
     startSymbol (CharCFG g) = ReprChar $ startSymbolCFG g
+    pick n (CharCFG g) (ReprChar s) = map ReprChar $ pickCFG n g s
 
 -- | Build a 'CharCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
@@ -627,6 +636,7 @@ instance Grammar StringCFG where
     getTerminals (StringCFG g) = S.map ReprString $ getTerminalsCFG g
     getNonTerminals (StringCFG g) = S.map ReprString $ getNonTerminalsCFG g
     startSymbol (StringCFG g) = ReprString $ startSymbolCFG g
+    pick n (StringCFG g) (ReprString s) = map ReprString $ pickCFG n g s
 
 -- | Build a 'StringCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG
