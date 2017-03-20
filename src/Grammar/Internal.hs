@@ -381,6 +381,9 @@ renumberMap start intMap =
 productionsToIntMap :: [(Label, Words)] -> IM.IntMap Words
 productionsToIntMap = IM.fromList
 
+pickInt :: Int -> IntCFG -> Label -> [Label]
+pickInt n g sym = toList $ productionsInt g sym V.! n
+
 instance Grammar IntCFG where
     data Repr IntCFG = ReprInt { unReprInt :: Label } deriving (Eq, Ord, Show)
     -- all the instance declarations do is actually wrap and unwrap the Repr
@@ -395,6 +398,7 @@ instance Grammar IntCFG where
     getTerminals = S.map ReprInt . getTerminalsInt
     getNonTerminals = S.map ReprInt . getNonTerminalsInt
     startSymbol _ = ReprInt 0
+    pick n g (ReprInt sym) = map ReprInt $ pickInt n g sym
 
 instance Show IntCFG where show = showGrammarBNF
 
