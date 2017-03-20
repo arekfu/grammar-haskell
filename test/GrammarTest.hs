@@ -3,11 +3,10 @@
 module GrammarTest
 ( runTests
 , ACharCFG(..)
-, AWord(..)
+, ALabelStrings(..)
 ) where
 
 -- system imports
-import Prelude hiding (Word, words)
 import Test.QuickCheck
 import qualified Data.IntMap as IM
 import qualified Data.Vector.Unboxed as VU
@@ -35,24 +34,24 @@ newtype ALabel = ALabel Label deriving (Eq, Ord, Show)
 instance Arbitrary ALabel where
     arbitrary = coerce <$> elements [labelMin..labelMax]
 
-maxWordLength :: Int
-maxWordLength = 4
+maxStringLength :: Int
+maxStringLength = 4
 
-newtype AWord = AWord Word deriving (Eq, Ord, Show)
-instance Arbitrary AWord where
-    arbitrary = do len <- elements [1..maxWordLength]
+newtype ALabelString = ALabelString LabelString deriving (Eq, Ord, Show)
+instance Arbitrary ALabelString where
+    arbitrary = do len <- elements [1..maxStringLength]
                    asList <- vectorOf len (arbitrary :: Gen Label)
                    coerce <$> return (Seq.fromList asList)
 
-newtype AWords = AWords Words deriving (Eq, Ord, Show)
-instance Arbitrary AWords where
-    arbitrary = do awords <- listOf1 arbitrary :: Gen [AWord]
-                   let words = coerce awords
-                   return $ AWords (V.fromList words)
+newtype ALabelStrings = ALabelStrings LabelStrings deriving (Eq, Ord, Show)
+instance Arbitrary ALabelStrings where
+    arbitrary = do astrings <- listOf1 arbitrary :: Gen [ALabelString]
+                   let strings = coerce astrings
+                   return $ ALabelStrings (V.fromList strings)
 
 newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show)
 instance Arbitrary AIntCFG where
-    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, AWords)]
+    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, ALabelStrings)]
                    let kvs = coerce akvs
                    let start = fst $ head kvs
                    let (grammar, _, _) = productionsToIntCFG start kvs
@@ -87,7 +86,7 @@ instance Arbitrary ACharCFG where
 
 -- | All the map keys (nonterminals) and all the element of the words must be
 --   found as labels.
-prop_collectLabelsInclusion :: IM.IntMap AWords -> Property
+prop_collectLabelsInclusion :: IM.IntMap ALabelStrings -> Property
 prop_collectLabelsInclusion intMapA =
     let intMap = coerce intMapA
         _labels = collectLabels intMap
@@ -98,7 +97,7 @@ prop_collectLabelsInclusion intMapA =
 
 -- | The renumbering must conserve the number of rules and the number of
 --   labels.
-prop_renumber :: Label -> IM.IntMap AWords -> Property
+prop_renumber :: Label -> IM.IntMap ALabelStrings -> Property
 prop_renumber start intMapA = start `IM.member` intMapA ==>
     let intMap = coerce intMapA
         (intMap', renumbering, inverseRenumbering) = renumberMap start intMap
