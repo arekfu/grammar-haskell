@@ -74,8 +74,8 @@ instance Arbitrary ACharCFG where
                    Positive (Small nonTerminalsSize) <- arbitrary :: Gen (Positive (Small Int))
                    wTerminals <- vectorOf terminalsSize arbitrary :: Gen [Terminal]
                    wNonTerminals <- vectorOf nonTerminalsSize arbitrary :: Gen [NonTerminal]
-                   let terminals = coerce wTerminals
-                   let nonTerminals = coerce wNonTerminals
+                   let terminals = S.toList $ S.fromList $ coerce wTerminals
+                   let nonTerminals = S.toList $ S.fromList $ coerce wNonTerminals
                    let start = head nonTerminals
                    let allLabels = terminals ++ nonTerminals
                    values <- vectorOf (length nonTerminals) $ listOf1 $ listOf (elements allLabels)
