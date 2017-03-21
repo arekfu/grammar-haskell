@@ -1,5 +1,5 @@
 {-|
-Module      : Grammar.Internal
+Module      : Grammar.CFG
 Description : Datatypes and main functions for CFG grammars.
 Copyright   : (c) Davide Mancusi, 2017
 License     : BSD3
@@ -11,7 +11,7 @@ This module contains the most important datatypes of the package and the
 functions that operate on them.
 -}
 
-module Grammar.Internal
+module Grammar.CFG
 (
 -- * The 'Grammar' typeclass
   Grammar(..)

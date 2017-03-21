@@ -33,11 +33,15 @@ module Grammar
 -- * Random grammar derivation
 , randomGrammarDerive
 , randomGrammarDeriveScan
+, module Grammar.Regex
+, module Grammar.Regex.Random
 ) where
 
 -- local imports
-import Grammar.Internal
-import Grammar.Random
+import Grammar.CFG
+import Grammar.CFG.Random
+import Grammar.Regex
+import Grammar.Regex.Random
 
 {- $examplegrammar #examplegrammar#
    We illustrate the pretty-printing functionality with the following example grammar:

@@ -1,4 +1,4 @@
-module GrammarTest
+module CFGTest
 ( runTests
 , ACharCFG(..)
 , ALabelStrings(..)
@@ -18,7 +18,7 @@ import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 
 -- local imports
-import Grammar.Internal
+import Grammar.CFG
 
 -----------------------------------------
 --  newtypes with Arbitrary instances  --

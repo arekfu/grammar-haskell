@@ -1,5 +1,5 @@
 {-|
-Module      : Grammar.Random
+Module      : Grammar.CFG.Random
 Description : Functions to randomly expand symbols and words according to a grammar.
 Copyright   : (c) Davide Mancusi, 2017
 License     : BSD3
@@ -16,14 +16,10 @@ equal probability. Depending on the grammar, this may lead the size of the
 generated word to grow without bound, or to become very large.
 -}
 
-module Grammar.Random
+module Grammar.CFG.Random
 (
--- * The 'MC' monad
-  MC
-, Seed
-, evalGrammar
 -- * Randomly expanding symbols and words
-, RandomGrammar(..)
+  RandomGrammar(..)
 , randomSymExpand
 , randomWordExpand
 , randomGrammarDerive
@@ -33,70 +29,10 @@ module Grammar.Random
 
 -- system imports
 import Prelude hiding (words)
-import System.Random
-import Control.Monad.State
-import Data.Foldable (Foldable, length, toList)
 
 -- local imports
-import Grammar.Internal
-
--- | Just a type alias for the PRNG seed.
-type Seed = Int
-
--- | The 'MC' type is just an alias for the 'State' 'StdGen' monad. Yes, 'MC' stands for Monte Carlo.
-type MC = State StdGen
-
-{- | How do I escape from the 'MC' monad? Just call evalGrammar and supply a
-   starting seed for the pseudo-random number generator.
--}
-evalGrammar :: MC a -- ^ the computation to perform
-            -> Seed -- ^ the starting seed
-            -> a    -- ^ the computation result
-evalGrammar obj seed = let initialGen = mkStdGen seed
-                        in evalState obj initialGen
-
------------------------------------------------
---  some machinery to sample random numbers  --
------------------------------------------------
-
-getGen :: MonadState StdGen m => m StdGen
-getGen = get
-
-_uniform :: (Random a, Fractional a, MonadState StdGen m) => m a
-_uniform = do
-    gen <- getGen
-    let (xi, gen') = randomR (0.0, 1.0) gen
-    put gen'
-    return xi
-
-uniformInt :: (Random a, Integral a, MonadState StdGen m) => a -> a -> m a
-uniformInt minVal maxVal = do
-    gen <- getGen
-    let (xi, gen') = randomR (minVal, maxVal) gen
-    put gen'
-    return xi
-
-_uniforms :: (Random a, Fractional a, MonadState StdGen m)
-         => Int
-         -> m [a]
-_uniforms n = replicateM n _uniform
-
--- | Sample from an exponential distribution of the form
--- @
--- f(x) = exp(-&#x3BB; x)/&#x3BB;
--- @
-_sampleExp :: (Random a, Floating a, MonadState StdGen m)
-          => a  -- ^ The distribution
-          -> m a
-_sampleExp lambda = do xi <- _uniform
-                       return $ (-lambda) * log xi
-
--- | Pick a random element from a Foldable container.
-pickRandom :: Foldable t => t a -> MC a
-pickRandom set = let l = toList set
-                     n = length l
-                  in do ran <- uniformInt 0 (n-1)
-                        return $ l !! ran
+import Grammar.CFG
+import Grammar.MC
 
 ---------------------------------------------------------
 --  functions to randomly derive sequences of symbols  --

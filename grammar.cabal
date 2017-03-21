@@ -17,9 +17,12 @@ tested-with:         GHC == 7.10.3, GHC == 8.0.2
 library
   hs-source-dirs:      src
   exposed-modules:     Grammar
-                     , Grammar.Random
                      , Grammar.ParseTree
-                     , Grammar.Internal
+                     , Grammar.MC
+                     , Grammar.CFG
+                     , Grammar.CFG.Random
+                     , Grammar.Regex
+                     , Grammar.Regex.Random
   build-depends:       base >= 4.7 && < 5
                      , containers
                      , random
@@ -48,8 +51,8 @@ test-suite grammar-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  other-modules:       GrammarTest
-                     , RandomTest
+  other-modules:       CFGTest
+                     , CFGRandomTest
   build-depends:       base
                      , grammar
                      , containers

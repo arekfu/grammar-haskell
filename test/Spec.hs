@@ -1,8 +1,8 @@
-import qualified GrammarTest
-import qualified RandomTest
+import qualified CFGTest
+import qualified CFGRandomTest
 
 main :: IO ()
 main = do
-    _ <- GrammarTest.runTests
-    _ <- RandomTest.runTests
+    _ <- CFGTest.runTests
+    _ <- CFGRandomTest.runTests
     return ()

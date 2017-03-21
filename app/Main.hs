@@ -1,7 +1,7 @@
 module Main where
 
 import Grammar
-import Grammar.Random
+import Grammar.MC
 
 import System.Clock
 
@@ -30,8 +30,8 @@ main :: IO ()
 main = do print exampleGrammar
           let expansion = randomGrammarDeriveScan exampleGrammar
           TimeSpec _ seed <- getTime Realtime
-          let strings = take 20 $ evalGrammar expansion $ fromIntegral seed
+          let strings = take 20 $ evalMC expansion $ fromIntegral seed
           mapM_ (putStrLn . showWord) strings
           print digitsGrammar
           let digitExpansion = randomGrammarDerive digitsGrammar
-          putStrLn $ showWord $ evalGrammar digitExpansion $ fromIntegral seed
+          putStrLn $ showWord $ evalMC digitExpansion $ fromIntegral seed
