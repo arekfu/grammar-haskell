@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 module RandomTest
 ( runTests
 ) where

@@ -16,8 +16,6 @@ equal probability. Depending on the grammar, this may lead the size of the
 generated word to grow without bound, or to become very large.
 -}
 
-{-# LANGUAGE FlexibleContexts, RankNTypes #-}
-
 module Grammar.Random
 (
 -- * The 'MC' monad

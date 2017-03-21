@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell, DeriveGeneric, DeriveAnyClass #-}
-
 module GrammarTest
 ( runTests
 , ACharCFG(..)
