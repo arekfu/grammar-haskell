@@ -11,6 +11,8 @@ This module contains the most important datatypes of the package and the
 functions that operate on them.
 -}
 
+{-# LANGUAGE TypeFamilies #-}
+
 module Grammar.CFG
 (
 -- * The 'Grammar' typeclass
