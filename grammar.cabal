@@ -53,6 +53,7 @@ test-suite grammar-test
   main-is:             Spec.hs
   other-modules:       CFGTest
                      , CFGRandomTest
+                     , RegexTest
   build-depends:       base
                      , grammar
                      , containers

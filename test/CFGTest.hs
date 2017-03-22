@@ -1,5 +1,7 @@
 module CFGTest
 ( runTests
+, Terminal(..)
+, NonTerminal(..)
 , ACharCFG(..)
 , ALabelStrings(..)
 ) where

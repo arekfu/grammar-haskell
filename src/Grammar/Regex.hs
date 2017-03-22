@@ -19,6 +19,7 @@ module Grammar.Regex
 -- system imports
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Data.List (intercalate)
 
 {- | The Regex datatype.
 -}
@@ -28,4 +29,14 @@ data Regex a = Lit a                    -- ^ A literal
              | Star (Regex a)           -- ^ Kleene star (0 or more)
              | Plus (Regex a)           -- ^ Kleene plus (1 or more)
              | QuestionMark (Regex a)   -- ^ Kleene question mark (0 or 1)
-             deriving (Eq, Ord, Show, Generic, NFData)
+             deriving (Eq, Ord, Generic, NFData)
+
+showRegex :: Show a => Regex a -> String
+showRegex (Lit a) = show a
+showRegex (Concat rs) = concatMap showRegex rs
+showRegex (Alt rs) = intercalate " | " $ map showRegex rs
+showRegex (Star r) = "(" ++ show r ++ ")*"
+showRegex (Plus r) = "(" ++ show r ++ ")+"
+showRegex (QuestionMark r) = "(" ++ show r ++ ")?"
+
+instance Show a => Show (Regex a) where show = showRegex
