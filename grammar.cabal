@@ -28,7 +28,6 @@ library
                      , random
                      , mtl
                      , vector
-                     , QuickCheck
                      , deepseq
   default-extensions:  DeriveGeneric
                      , DeriveAnyClass
