@@ -54,6 +54,8 @@ test-suite grammar-test
   other-modules:       CFGTest
                      , CFGRandomTest
                      , RegexTest
+                     , RegexRandomTest
+                     , SymbolsTest
   build-depends:       base
                      , grammar
                      , containers

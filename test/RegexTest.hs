@@ -10,7 +10,7 @@ import Test.QuickCheck
 import Data.Coerce
 
 -- local imports
-import CFGTest (NonTerminal)
+import SymbolsTest (NonTerminal)
 import Grammar.Regex
 
 

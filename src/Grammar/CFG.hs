@@ -28,8 +28,6 @@ module Grammar.CFG
 , IntCFG(..)
 -- ** Type synonims
 , Label
-, LabelString
-, LabelStrings
 , InverseRelabelling
 , Relabelling
 -- ** Manipulators
@@ -53,9 +51,7 @@ module Grammar.CFG
 , unsafeToSymbol
 , unsafeToLabel
 , symbolsToLabels
-, symbolsToLabelLists
 , labelsToSymbols
-, labelListsToSymbols
 -- * Context-free grammars over alphabets of specific types
 , CharCFG(..)
 , productionsToCharCFG
@@ -68,14 +64,15 @@ import qualified Data.Map.Strict as M
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Set as S
 import qualified Data.IntSet as IS
-import Data.Maybe (fromMaybe, fromJust)
-import Data.Foldable (foldr', foldr1, toList)
+import Data.Maybe (fromJust, mapMaybe)
+import Data.Foldable (foldr', toList)
 import qualified Data.Vector as V
-import qualified Data.Sequence as Seq
 import qualified Data.Vector.Unboxed as VU
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 
+-- local imports
+import Grammar.Regex
 
 {- |
 A typeclass that specifies how grammar datatypes should behave. A production
@@ -88,7 +85,7 @@ class Grammar g where
     data Repr g :: *
 
     -- | @productions gr sym@ returns the productions associated with label @sym@ in grammar @gr@.
-    productions :: g -> Repr g -> [[Repr g]]
+    productions :: g -> Repr g -> Maybe (Regex (Repr g))
 
     -- | Convert a symbol to a 'String'.
     showSymbol :: Repr g -> String
@@ -121,14 +118,6 @@ class Grammar g where
     -- | Returns the start symbol of the grammar
     startSymbol :: g -> Repr g
 
-    -- | Pick the @n@-th production rule associated with a given symbol. WARNING:
-    --   unsafe if @n@ is out of bounds.
-    pick :: Int         -- ^ @n@, the rank of the selected rule
-         -> g           -- ^ the grammar
-         -> Repr g      -- ^ the nonterminal
-         -> [Repr g]    -- ^ the associated production rule
-    pick n grammar sym = productions grammar sym !! n
-
 
 -- | Pretty-print a word (a sequence of symbols).
 showWord :: Grammar g
@@ -144,13 +133,15 @@ showWord = concatMap showSymbol
    E -> (E)
    E -> I
 -}
-showProductions :: Grammar g
+showProductions :: (Grammar g, Show (Repr g))
                 => g            -- ^ the grammar
                 -> Repr g       -- ^ the symbol on the left-hand side of the rule
                 -> String       -- ^ the pretty-printed production rule
 showProductions grammar sym = let header = showSymbol sym
-                                  ls = productions grammar sym
-                               in concatMap (\l -> header ++ " -> " ++ showWord l ++ "\n") ls
+                                  prod = productions grammar sym
+                               in case prod of
+                                      Nothing   -> ""
+                                      Just rule -> header ++ " -> " ++ showRegex rule ++ "\n"
 
 {- | Pretty-print all the production rules associated with a symbol, in
      Backus-Naur form.
@@ -158,19 +149,16 @@ showProductions grammar sym = let header = showSymbol sym
    >>> putStrLn $ showProductionsBNF exampleGrammar 'E'
    E := E+E | E*E | (E) | I
 -}
-showProductionsBNF :: Grammar g
+showProductionsBNF :: (Grammar g, Show (Repr g))
                    => g            -- ^ the grammar
                    -> Repr g       -- ^ the symbol on the left-hand side of the rule
                    -> String       -- ^ the pretty-printed production rule
 showProductionsBNF grammar sym = let header = showSymbol sym
-                                     ls = productions grammar sym
-                                  in header ++ " := " ++ joinProductionsBNF ls ++ "\n"
+                                     prod = productions grammar sym
+                               in case prod of
+                                      Nothing   -> ""
+                                      Just rule -> header ++ " := " ++ showRegex rule ++ "\n"
 
-
--- | Helper function to concatenate production rules in BNF form.
-joinProductionsBNF :: Grammar g => [[Repr g]] -> String
-joinProductionsBNF [] = ""
-joinProductionsBNF ps = foldr1 (\rule rest -> rule ++ " | " ++ rest) $ map showWord ps
 
 {- | Pretty-print all the production rules in a grammar using an external
      function to display lists of production rules.
@@ -233,9 +221,9 @@ showGrammarBNF = showGrammarWith showProductionsBNF
 
 
 -- | Represent all grammar production rules as an association list
-allProductions :: Grammar g => g -> [(Repr g, [Repr g])]
+allProductions :: Grammar g => g -> [(Repr g, Regex (Repr g))]
 allProductions g = let nonterms = toList $ getNonTerminals g
-                    in zip nonterms $ concatMap (productions g) nonterms
+                    in zip nonterms $ mapMaybe (productions g) nonterms
 
 
 ---------------------------------------
@@ -259,7 +247,7 @@ as "is this symbol terminal?".
 For efficiency reasons, the 'CFG' datatype is built upon an 'IntCFG'.
 -}
 
-data IntCFG = IntCFG Label Label (IM.IntMap LabelStrings) deriving (Eq, Ord, Generic, NFData)
+data IntCFG = IntCFG Label Label (IM.IntMap (Regex Label)) deriving (Eq, Ord, Generic, NFData)
 -- ^ The default constructor takes the next available label @n@, the label of
 -- the first nonterminal symbol and the 'Data.IntMap.IntMap' representing the
 -- production rules.
@@ -267,16 +255,8 @@ data IntCFG = IntCFG Label Label (IM.IntMap LabelStrings) deriving (Eq, Ord, Gen
 -- | Type synonim for 'Int'.
 type Label = Int
 
--- | Type synonim for a sequence of 'Int's.
-type LabelString = Seq.Seq Label
-
--- | Type synonim for the collection of production rules associated to a given
---   symbol.
-type LabelStrings = V.Vector LabelString
-
-productionsInt :: IntCFG -> Label -> LabelStrings
-productionsInt (IntCFG _ _ prods) nt = let inMap = IM.lookup nt prods
-                                        in fromMaybe V.empty inMap
+productionsInt :: IntCFG -> Label -> Maybe (Regex Label)
+productionsInt (IntCFG _ _ prods) nt = IM.lookup nt prods
 
 isInIntCFG :: Label -> IntCFG -> Bool
 isInIntCFG c (IntCFG n _ _) = c >= 0 && c < n
@@ -313,23 +293,23 @@ invert = VU.ifoldr' (\i label inverse -> IM.insert label i inverse) IM.empty
 inverseRenumberLabel :: InverseRelabelling -> Label -> Label
 inverseRenumberLabel renumb label = renumb VU.! label
 
--- | Apply the inverse relabelling to a given 'LabelString'
-inverseRenumberLabels :: InverseRelabelling -> LabelString -> LabelString
+-- | Apply the inverse relabelling to a given 'Regex' 'Label'
+inverseRenumberLabels :: InverseRelabelling -> Regex Label -> Regex Label
 inverseRenumberLabels renumb = fmap (inverseRenumberLabel renumb)
 
 -- | Apply the relabelling to a given 'Label'
 renumberLabel :: Relabelling -> Label -> Label
 renumberLabel iRenumb label = fromJust $ IM.lookup label iRenumb
 
--- | Apply the relabelling to a given 'LabelString'
-renumberLabels :: Relabelling -> LabelString -> LabelString
+-- | Apply the relabelling to a given 'Regex' 'Label'
+renumberLabels :: Relabelling -> Regex Label -> Regex Label
 renumberLabels iRenumb = fmap (renumberLabel iRenumb)
 
 -- | Return all labels appearing in a set of (integer) production rules.
-collectLabels :: IM.IntMap LabelStrings -> IS.IntSet
+collectLabels :: IM.IntMap (Regex Label) -> IS.IntSet
 collectLabels =
-    let insertStrings :: IS.IntSet -> LabelStrings -> IS.IntSet
-        insertStrings = V.foldr' (flip (foldr' IS.insert))
+    let insertStrings :: IS.IntSet -> Regex Label -> IS.IntSet
+        insertStrings = foldr' IS.insert
      in IM.foldrWithKey (\key values set -> insertStrings (IS.insert key set) values) IS.empty
 
 {- | Build an 'IntCFG' from an association list of @(nonterminal, productions)@
@@ -338,14 +318,14 @@ collectLabels =
      is returned along with the built grammar, in the form of a
      'Data.Vector.Unboxed.Vector' 'Label' indexed by the renumbered labels.
 -}
-productionsToIntCFG :: Label -> [(Label, LabelStrings)] -> (IntCFG, InverseRelabelling, Relabelling)
+productionsToIntCFG :: Label -> [(Label, Regex Label)] -> (IntCFG, InverseRelabelling, Relabelling)
 productionsToIntCFG start = intMapToIntCFG start . productionsToIntMap
 
 {- | Build an 'IntCFG' from an 'Data.IntMap.IntMap' between 'Label's. The
      'Labels' will be renumbered as specified in the second and third return
      values.
 -}
-intMapToIntCFG :: Label -> IM.IntMap LabelStrings -> (IntCFG, InverseRelabelling, Relabelling)
+intMapToIntCFG :: Label -> IM.IntMap (Regex Label) -> (IntCFG, InverseRelabelling, Relabelling)
 intMapToIntCFG start intMap = let (intMap', inverseRelabelling, relabelling) = renumberMap start intMap
                                   maxLabel = VU.length inverseRelabelling - 1
                                   nNonTerms = IM.size intMap
@@ -359,8 +339,8 @@ intMapToIntCFG start intMap = let (intMap', inverseRelabelling, relabelling) = r
      'Data.IntMap.IntMap'.  The starting symbol is always renumbered as 0.
 -}
 renumberMap :: Label                    -- ^ The label of the starting symbol
-            -> IM.IntMap LabelStrings   -- ^ The map to renumber
-            -> (IM.IntMap LabelStrings, InverseRelabelling, Relabelling)
+            -> IM.IntMap (Regex Label)  -- ^ The map to renumber
+            -> (IM.IntMap (Regex Label), InverseRelabelling, Relabelling)
             -- ^ The renumbered map, the new-to-old mapping and the old-to-new mapping
 renumberMap start intMap =
     let allLabels = collectLabels intMap
@@ -370,24 +350,21 @@ renumberMap start intMap =
         inverseRelabelling = VU.fromList $ start : IS.toList nonTermsExceptStart ++ IS.toList terms
         relabelling = invert inverseRelabelling
         intMap' = IM.mapKeys (renumberLabel relabelling) intMap
-        intMap'' = fmap (fmap (renumberLabels relabelling)) intMap'
+        intMap'' = fmap (renumberLabels relabelling) intMap'
      in (intMap'', inverseRelabelling, relabelling)
 
 {- | Provide the fundamental building block to construct an 'IntCFG' from an
      association list of @(nonterminal, productions)@ pairs. The Labels are
      not guaranteed to span the @[0,n-1]@ range.
 -}
-productionsToIntMap :: [(Label, LabelStrings)] -> IM.IntMap LabelStrings
+productionsToIntMap :: [(Label, Regex Label)] -> IM.IntMap (Regex Label)
 productionsToIntMap = IM.fromList
-
-pickInt :: Int -> IntCFG -> Label -> [Label]
-pickInt n g sym = toList $ productionsInt g sym V.! n
 
 instance Grammar IntCFG where
     data Repr IntCFG = ReprInt { unReprInt :: Label } deriving (Eq, Ord, Show)
     -- all the instance declarations do is actually wrap and unwrap the Repr
     -- datatype
-    productions g (ReprInt sym) = toList $ (fmap ReprInt . toList) <$> productionsInt g sym
+    productions g (ReprInt sym) = (fmap ReprInt) <$> productionsInt g sym
     showSymbol (ReprInt sym) = show sym
     isInGrammar (ReprInt sym) = isInIntCFG sym
     isNotInGrammar (ReprInt sym) = isNotInIntCFG sym
@@ -397,7 +374,6 @@ instance Grammar IntCFG where
     getTerminals = S.map ReprInt . getTerminalsInt
     getNonTerminals = S.map ReprInt . getNonTerminalsInt
     startSymbol _ = ReprInt 0
-    pick n g (ReprInt sym) = map ReprInt $ pickInt n g sym
 
 instance Show IntCFG where show = showGrammarBNF
 
@@ -443,21 +419,13 @@ toSymbol dict label = dict V.!? label
 unsafeToSymbol :: LabelToSymbolDict a -> Label -> a
 unsafeToSymbol dict label =  dict V.! label
 
--- | Convert a list of symbols to a list of labels.
-symbolsToLabels :: Ord a => SymbolToLabelDict a -> [a] -> [Label]
-symbolsToLabels dict = map (unsafeToLabel dict)
+-- | Convert a 'Regex' of symbols to a 'Regex' of 'Label's.
+symbolsToLabels :: (Functor f, Ord a) => SymbolToLabelDict a -> f a -> f Label
+symbolsToLabels dict = fmap (unsafeToLabel dict)
 
--- | Convert a list of lists of symbols to a list of lists of labels.
-symbolsToLabelLists :: Ord a => SymbolToLabelDict a -> [[a]] -> [[Label]]
-symbolsToLabelLists dict = map (symbolsToLabels dict)
-
--- | Convert a list of labels to a list of symbols.
-labelsToSymbols :: LabelToSymbolDict a -> [Label] -> [a]
-labelsToSymbols dict = map (unsafeToSymbol dict)
-
--- | Convert a list of label strings to a list of symbol strings.
-labelListsToSymbols :: LabelToSymbolDict a -> [[Label]] -> [[a]]
-labelListsToSymbols dict = map (labelsToSymbols dict)
+-- | Convert a 'Functor' of 'Label's to a 'Functor' of symbols.
+labelsToSymbols :: Functor f => LabelToSymbolDict a -> f Label -> f a
+labelsToSymbols dict = fmap (unsafeToSymbol dict)
 
 -- | Extract all the symbols from an association list of production rules.
 gatherAllSymbols :: Ord a => [(a, [[a]])] -> S.Set a
@@ -470,17 +438,17 @@ gatherAllSymbols = foldr' insertKeyValue S.empty
      of labels, along with dictionaries to translate symbols to labels and
      vice-versa.
 -}
-labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, LabelStrings)], LabelToSymbolDict a, SymbolToLabelDict a)
+labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Regex Label)], LabelToSymbolDict a, SymbolToLabelDict a)
 labelAllSymbols kvs = let allSymbols = gatherAllSymbols kvs
                           labelsToSymbolsDict = V.fromList $ S.toList allSymbols
                           symbolsToLabelsDict = invertSymbolToLabelDict labelsToSymbolsDict
                           labelledAssocList = labelKeyValues kvs symbolsToLabelsDict
                        in (labelledAssocList, labelsToSymbolsDict, symbolsToLabelsDict)
 
-labelKeyValues :: Ord a => [(a, [[a]])] -> SymbolToLabelDict a -> [(Label, LabelStrings)]
+labelKeyValues :: Ord a => [(a, [[a]])] -> SymbolToLabelDict a -> [(Label, Regex Label)]
 labelKeyValues kvs dict =
     let translate s = fromJust $ M.lookup s dict
-     in map (\(k, vs) -> (translate k, V.fromList $ map (Seq.fromList . map translate) vs)) kvs
+     in map (\(k, vs) -> (translate k, Alt (map (Concat . map (Lit . translate)) vs))) kvs
 
 -- | Invert an 'Int'-to-@a@ labelling.
 invertSymbolToLabelDict :: Ord a => LabelToSymbolDict a -> SymbolToLabelDict a
@@ -513,12 +481,11 @@ productionsToCFG start kvs =
         symbolsToLabelsDict' = invertSymbolToLabelDict labelsToSymbolsDict'
      in CFG start intCFG symbolsToLabelsDict' labelsToSymbolsDict'
 
-productionsCFG :: Ord a => CFG a -> a -> [[a]]
+productionsCFG :: Ord a => CFG a -> a -> Maybe (Regex a)
 productionsCFG (CFG _ iGr s2l l2s) symbol =
-    case toLabel s2l symbol of
-        Nothing  -> []
-        Just label -> let prodsInt = productionsInt iGr label
-                       in labelListsToSymbols l2s $ toList (V.map toList prodsInt)
+    do label <- toLabel s2l symbol
+       prodsInt <- productionsInt iGr label
+       return $ labelsToSymbols l2s prodsInt
 
 isInCFG :: Ord a => a -> CFG a -> Bool
 isInCFG c (CFG _ iGr s2l _) = case toLabel s2l c of
@@ -557,16 +524,9 @@ getNonTerminalsCFG (CFG _ iGr _ l2s) = let labels = getNonTerminalsInt iGr
 startSymbolCFG :: CFG a -> a
 startSymbolCFG (CFG start _ _ _) = start
 
-pickCFG :: Ord a => Int -> CFG a -> a -> [a]
-pickCFG n (CFG _ iGr s2l l2s) sym =
-    let label = toLabel s2l sym
-     in case label of
-            Nothing -> []
-            Just l -> map (unsafeToSymbol l2s) $ toList $ productionsInt iGr l V.! n
-
 instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     data Repr (CFG a) = ReprCFG { unReprCFG :: a } deriving (Eq, Ord, Show)
-    productions grammar (ReprCFG s) = map (map ReprCFG) $ productionsCFG grammar s
+    productions grammar (ReprCFG s) = (fmap ReprCFG) <$> productionsCFG grammar s
     showSymbol = show
     isInGrammar (ReprCFG s) = isInCFG s
     isNotInGrammar (ReprCFG s) = isNotInCFG s
@@ -576,7 +536,6 @@ instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     getTerminals = S.map ReprCFG . getTerminalsCFG
     getNonTerminals = S.map ReprCFG . getNonTerminalsCFG
     startSymbol = ReprCFG . startSymbolCFG
-    pick n g (ReprCFG sym) = map ReprCFG $ pickCFG n g sym
 
 instance (Ord a, Show a) => Show (CFG a) where show = showGrammarBNF
 
@@ -594,7 +553,7 @@ newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord, Generic, NFData)
 
 instance Grammar CharCFG where
     data Repr CharCFG = ReprChar { unReprChar :: Char } deriving (Eq, Ord, Show)
-    productions (CharCFG g) (ReprChar c) = map (map ReprChar) $ productionsCFG g c
+    productions (CharCFG g) (ReprChar c) = (fmap ReprChar) <$> productionsCFG g c
     showSymbol (ReprChar s) = [s]
     isInGrammar (ReprChar s) (CharCFG g) = isInCFG s g
     isNotInGrammar (ReprChar s) (CharCFG g) = isNotInCFG s g
@@ -604,7 +563,6 @@ instance Grammar CharCFG where
     getTerminals (CharCFG g) = S.map ReprChar $ getTerminalsCFG g
     getNonTerminals (CharCFG g) = S.map ReprChar $ getNonTerminalsCFG g
     startSymbol (CharCFG g) = ReprChar $ startSymbolCFG g
-    pick n (CharCFG g) (ReprChar s) = map ReprChar $ pickCFG n g s
 
 -- | Build a 'CharCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
@@ -625,7 +583,7 @@ newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord, Generic, NFData)
 
 instance Grammar StringCFG where
     data Repr StringCFG = ReprString { unReprString :: String } deriving (Eq, Ord, Show)
-    productions (StringCFG g) (ReprString s) = map (map ReprString) $ productionsCFG g s
+    productions (StringCFG g) (ReprString s) = (fmap ReprString) <$> productionsCFG g s
     showSymbol (ReprString s) = s
     isInGrammar (ReprString s) (StringCFG g)= isInCFG s g
     isNotInGrammar (ReprString s) (StringCFG g) = isNotInCFG s g
@@ -635,7 +593,6 @@ instance Grammar StringCFG where
     getTerminals (StringCFG g) = S.map ReprString $ getTerminalsCFG g
     getNonTerminals (StringCFG g) = S.map ReprString $ getNonTerminalsCFG g
     startSymbol (StringCFG g) = ReprString $ startSymbolCFG g
-    pick n (StringCFG g) (ReprString s) = map ReprString $ pickCFG n g s
 
 -- | Build a 'StringCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG

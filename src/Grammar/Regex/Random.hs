@@ -29,16 +29,17 @@ expConstant :: Double
 expConstant = 3.0
 
 randomExpandRegex :: Regex a -> MC [a]
+randomExpandRegex Empty = return []
 randomExpandRegex (Lit x) = return [x]
 randomExpandRegex (Concat xs) = concat <$> (sequence $ map randomExpandRegex xs)
 randomExpandRegex (Alt xs) = randomExpandRegex =<< pickRandom xs
 randomExpandRegex (Star r) = do xi <- sampleExp expConstant
                                 expanded <- randomExpandRegex r
-                                let n = floor xi
+                                let n = round xi
                                 return $ concat $ replicate n expanded
 randomExpandRegex (Plus r) = do xi <- sampleExp expConstant
                                 expanded <- randomExpandRegex r
-                                let n = 1 + floor xi
+                                let n = 1 + round xi
                                 return $ concat $ replicate n expanded
-randomExpandRegex (QuestionMark r) = do xi <- sampleExp expConstant
+randomExpandRegex (QuestionMark r) = do xi <- uniform :: MC Double
                                         if xi < 0.5 then randomExpandRegex r else return []

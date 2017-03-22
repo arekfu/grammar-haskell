@@ -3,7 +3,6 @@ module CFGTest
 , Terminal(..)
 , NonTerminal(..)
 , ACharCFG(..)
-, ALabelStrings(..)
 ) where
 
 -- system imports
@@ -14,13 +13,14 @@ import qualified Data.IntSet as IS
 import qualified Data.Set as S
 import qualified Data.Vector as V
 import qualified Data.Map as M
-import qualified Data.Sequence as Seq
 import Data.Coerce
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 
 -- local imports
 import Grammar.CFG
+import SymbolsTest
+import RegexTest (ARegex(..))
 
 -----------------------------------------
 --  newtypes with Arbitrary instances  --
@@ -36,38 +36,13 @@ newtype ALabel = ALabel Label deriving (Eq, Ord, Show)
 instance Arbitrary ALabel where
     arbitrary = coerce <$> elements [labelMin..labelMax]
 
-maxStringLength :: Int
-maxStringLength = 4
-
-newtype ALabelString = ALabelString LabelString deriving (Eq, Ord, Show)
-instance Arbitrary ALabelString where
-    arbitrary = do len <- elements [1..maxStringLength]
-                   asList <- vectorOf len (arbitrary :: Gen Label)
-                   coerce <$> return (Seq.fromList asList)
-
-newtype ALabelStrings = ALabelStrings LabelStrings deriving (Eq, Ord, Show)
-instance Arbitrary ALabelStrings where
-    arbitrary = do astrings <- listOf1 arbitrary :: Gen [ALabelString]
-                   let strings = coerce astrings
-                   return $ ALabelStrings (V.fromList strings)
-
 newtype AIntCFG = AIntCFG IntCFG deriving (Eq, Ord, Show, Generic, NFData)
 instance Arbitrary AIntCFG where
-    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, ALabelStrings)]
+    arbitrary = do akvs <- listOf1 arbitrary :: Gen [(ALabel, ARegex ALabel)]
                    let kvs = coerce akvs
                    let start = fst $ head kvs
                    let (grammar, _, _) = productionsToIntCFG start kvs
                    return $ coerce grammar
-
-newtype Terminal = Terminal Char deriving (Eq, Ord)
-instance Show Terminal where show (Terminal c) = [c]
-instance Arbitrary Terminal where
-    arbitrary = Terminal <$> elements (['_', '+', '*'] ++ ['a'..'z'] ++ ['0'..'9'])
-
-newtype NonTerminal = NonTerminal Char deriving (Eq, Ord)
-instance Show NonTerminal where show (NonTerminal c) = [c]
-instance Arbitrary NonTerminal where
-    arbitrary = NonTerminal <$> elements ['A'..'Z']
 
 newtype ACharCFG = ACharCFG CharCFG deriving (Show, Eq, Generic, NFData)
 instance Arbitrary ACharCFG where
@@ -88,18 +63,18 @@ instance Arbitrary ACharCFG where
 
 -- | All the map keys (nonterminals) and all the element of the words must be
 --   found as labels.
-prop_collectLabelsInclusion :: IM.IntMap ALabelStrings -> Property
+prop_collectLabelsInclusion :: IM.IntMap (ARegex ALabel) -> Property
 prop_collectLabelsInclusion intMapA =
     let intMap = coerce intMapA
         _labels = collectLabels intMap
         keys = IM.keysSet intMap
         values = IM.elems intMap
      in keys `IS.isSubsetOf` _labels
-        .&&. all (all (all (`IS.member` _labels))) values
+        .&&. all (all (`IS.member` _labels)) values
 
 -- | The renumbering must conserve the number of rules and the number of
 --   labels.
-prop_renumber :: Label -> IM.IntMap ALabelStrings -> Property
+prop_renumber :: Label -> IM.IntMap (ARegex ALabel) -> Property
 prop_renumber start intMapA = start `IM.member` intMapA ==>
     let intMap = coerce intMapA
         (intMap', renumbering, inverseRenumbering) = renumberMap start intMap

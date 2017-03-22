@@ -33,6 +33,7 @@ import Prelude hiding (words)
 -- local imports
 import Grammar.CFG
 import Grammar.MC
+import Grammar.Regex.Random (randomExpandRegex)
 
 ---------------------------------------------------------
 --  functions to randomly derive sequences of symbols  --
@@ -80,8 +81,8 @@ randomSymExpand :: (Grammar g, Ord (Repr g))
                 -> Repr g       -- ^ the symbol to expand
                 -> MC [Repr g]  -- ^ the resulting word
 randomSymExpand gr sym = case productions gr sym of
-                                [] -> return [sym]
-                                words -> pickRandom words
+                                Nothing    -> return [sym]
+                                Just regex -> randomExpandRegex regex
 
 -- | Expand a word (a sequence of symbols) using randomly selected
 --   production rules for each nonterminal.
@@ -116,25 +117,25 @@ randomGrammarDeriveScan :: (RandomGrammar g, Ord (Repr g))
                         -> MC [[Repr g]]   -- ^ the list of all intermediate expansions
 randomGrammarDeriveScan grammar = randomWordDeriveScan grammar [startSymbol grammar]
 
-delegateCFGToIntCFG :: Ord b
-                    => (forall g. RandomGrammar g => g -> [Repr g] -> MC ([Repr g]))
+delegateCFGToIntCFG :: (Functor f, Ord b)
+                    => (forall g. RandomGrammar g => g -> f (Repr g) -> MC (f (Repr g)))
                     -> CFG b
-                    -> [Repr (CFG b)]
-                    -> MC [Repr (CFG b)]
+                    -> f (Repr (CFG b))
+                    -> MC (f (Repr (CFG b)))
 delegateCFGToIntCFG action (CFG _ iGr s2l l2s) word =
-    let labelWord = map ReprInt $ symbolsToLabels s2l $ map unReprCFG word
+    let labelWord = ReprInt <$> (symbolsToLabels s2l (unReprCFG <$> word))
      in do derived <- action iGr labelWord
-           return $ map ReprCFG $ labelsToSymbols l2s $ map unReprInt derived
+           return (ReprCFG <$> (labelsToSymbols l2s (unReprInt <$> derived)))
 
-delegateCFGToIntCFG2 :: Ord b
-                     => (forall g. RandomGrammar g => g -> [Repr g] -> MC ([[Repr g]]))
+delegateCFGToIntCFG2 :: (Functor f, Ord b)
+                     => (forall g. RandomGrammar g => g -> f (Repr g) -> MC (f (f (Repr g))))
                      -> CFG b
-                     -> [Repr (CFG b)]
-                     -> MC [[Repr (CFG b)]]
-delegateCFGToIntCFG2 action (CFG _ iGr s2l l2s) word =
-    let labelWord = map ReprInt $ symbolsToLabels s2l $ map unReprCFG word
-     in do derived <- action iGr labelWord
-           return $ map (map ReprCFG) $ map (labelsToSymbols l2s) $ map (map unReprInt) derived
+                     -> f (Repr (CFG b))
+                     -> MC (f (f (Repr (CFG b))))
+delegateCFGToIntCFG2 action (CFG _ iGr s2l l2s) regex =
+    let labelRegex = ReprInt <$> (symbolsToLabels s2l $ (unReprCFG <$> regex))
+     in do derived <- action iGr labelRegex
+           return ((fmap ReprCFG) <$> (fmap (labelsToSymbols l2s) ((fmap unReprInt) <$> derived)))
 
 instance RandomGrammar IntCFG
 
