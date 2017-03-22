@@ -2,7 +2,7 @@
 
 module RegexTest
 ( ARegex(..)
-, runTests
+, printExamples
 ) where
 
 -- system imports
@@ -29,8 +29,9 @@ instance Arbitrary a => Arbitrary (ARegex a) where
                   , (QuestionMark . coerce) <$> aRegexSized n
                   ]
 
+printExamples :: IO ()
+printExamples = do putStrLn "Generating some random regexes..."
+                   rs <- sample' (arbitrary :: Gen (ARegex NonTerminal))
+                   mapM_ (print . unARegex) rs
 
-runTests :: IO ()
-runTests = do putStrLn "Generating some random regexes..."
-              rs <- sample' (arbitrary :: Gen (ARegex NonTerminal))
-              mapM_ (print . unARegex) rs
+

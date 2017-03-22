@@ -5,7 +5,8 @@ import qualified RegexRandomTest
 
 main :: IO ()
 main = do
-    _ <- RegexRandomTest.runTests
+    _ <- RegexRandomTest.printExamples
+    _ <- RegexTest.printExamples
     _ <- RegexTest.runTests
     _ <- CFGTest.runTests
     _ <- CFGRandomTest.runTests
