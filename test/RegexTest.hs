@@ -2,12 +2,16 @@
 
 module RegexTest
 ( ARegex(..)
+, runTests
 , printExamples
 ) where
 
 -- system imports
 import Test.QuickCheck
+import Test.QuickCheck.Function
+import Data.Foldable
 import Data.Coerce
+import Data.Monoid (Sum, Endo(..), Dual(..), appEndo, getDual)
 
 -- local imports
 import SymbolsTest (NonTerminal)
@@ -15,7 +19,6 @@ import Grammar.Regex
 
 
 newtype ARegex a = ARegex { unARegex :: Regex a } deriving (Eq, Ord, Show)
-
 
 instance Arbitrary a => Arbitrary (ARegex a) where
     arbitrary = sized aRegexSized
@@ -29,9 +32,39 @@ instance Arbitrary a => Arbitrary (ARegex a) where
                   , (QuestionMark . coerce) <$> aRegexSized n
                   ]
 
+prop_functorLaw1 :: (Eq a, Show a) => ARegex a -> Property
+prop_functorLaw1 (ARegex regex) =
+    fmap id regex === regex
+
+
+prop_functorLaw2 :: (Eq c, Show c) => Fun a b -> Fun b c -> ARegex a -> Property
+prop_functorLaw2 (Fun _ f) (Fun _ g) (ARegex regex) =
+    fmap (g . f) regex === fmap g (fmap f regex)
+
+
+prop_foldableLaw1 :: ARegex (Sum Int) -> Property
+prop_foldableLaw1 (ARegex regex) =
+    foldMap id regex === fold regex
+
+
+prop_foldableLaw2 :: Fun Char (Fun Int Int) -> Int -> ARegex Char -> Property
+prop_foldableLaw2 (Fun _ f) z (ARegex regex) =
+    let f' = apply . f
+     in foldr f' z regex === appEndo (foldMap (Endo . f') regex) z
+
+prop_foldableLaw3 :: Fun Int (Fun Char Int) -> Int -> ARegex Char -> Property
+prop_foldableLaw3 (Fun _ f) z (ARegex regex) =
+    let f' = apply . f
+     in foldl f' z regex === appEndo (getDual (foldMap (Dual . Endo . flip f') regex)) z
+
+
+
 printExamples :: IO ()
 printExamples = do putStrLn "Generating some random regexes..."
                    rs <- sample' (arbitrary :: Gen (ARegex NonTerminal))
                    mapM_ (print . unARegex) rs
 
 
+return []
+runTests :: IO Bool
+runTests = $quickCheckAll
