@@ -32,6 +32,14 @@ instance Arbitrary a => Arbitrary (ARegex a) where
                   , (QuestionMark . coerce) <$> aRegexSized n
                   ]
 
+    shrink (ARegex Empty)            = []
+    shrink (ARegex (Lit _))          = [ARegex Empty]
+    shrink (ARegex (Concat rs))      = coerce rs
+    shrink (ARegex (Alt rs))         = coerce rs
+    shrink (ARegex (Star r))         = [ARegex r]
+    shrink (ARegex (Plus r))         = [ARegex r]
+    shrink (ARegex (QuestionMark r)) = [ARegex r]
+
 prop_functorLaw1 :: (Eq a, Show a) => ARegex a -> Property
 prop_functorLaw1 (ARegex regex) =
     fmap id regex === regex
