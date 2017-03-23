@@ -14,6 +14,7 @@ context-free grammars.
 module Grammar.Regex
 ( Regex(..)
 , showRegex
+, simplify
 ) where
 
 
@@ -60,3 +61,23 @@ instance Foldable Regex where
     foldMap f (Star r) = foldMap f r
     foldMap f (Plus r) = foldMap f r
     foldMap f (QuestionMark r) = foldMap f r
+
+simplify :: Regex a -> Regex a
+simplify (Concat [r]) = r
+simplify (Alt [r]) = r
+simplify (Star (Star r)) = Star $ simplify r
+simplify (Star (Plus r)) = Star $ simplify r
+simplify (Plus (Plus r)) = Plus $ simplify r
+simplify (Plus (Star r)) = Star $ simplify r
+simplify (QuestionMark (QuestionMark r)) = QuestionMark $ simplify r
+simplify (QuestionMark (Star r)) = Star $ simplify r
+simplify (Star (QuestionMark r)) = Star $ simplify r
+simplify (QuestionMark (Plus r)) = Star $ simplify r
+simplify (Plus (QuestionMark r)) = Star $ simplify r
+simplify Empty = Empty
+simplify (Lit a) = Lit a
+simplify (Concat rs) = Concat $ map simplify rs
+simplify (Alt rs) = Alt $ map simplify rs
+simplify (Star r) = Star $ simplify r
+simplify (Plus r) = Plus $ simplify r
+simplify (QuestionMark r) = QuestionMark $ simplify r
