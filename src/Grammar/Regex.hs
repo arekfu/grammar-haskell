@@ -62,9 +62,23 @@ instance Foldable Regex where
     foldMap f (Plus r) = foldMap f r
     foldMap f (QuestionMark r) = foldMap f r
 
+spliceConcat :: [Regex a] -> [Regex a]
+spliceConcat ((Concat rs):rest) = rs ++ spliceConcat rest
+spliceConcat (r:rs) = r : spliceConcat rs
+spliceConcat [] = []
+
+spliceAlt :: [Regex a] -> [Regex a]
+spliceAlt ((Alt rs):rest) = rs ++ spliceAlt rest
+spliceAlt (r:rs) = r : spliceAlt rs
+spliceAlt [] = []
+
 simplify :: Regex a -> Regex a
-simplify (Concat [r]) = r
-simplify (Alt [r]) = r
+simplify Empty = Empty
+simplify (Lit a) = Lit a
+simplify (Concat [r]) = simplify r
+simplify (Concat rs) = Concat $ map simplify $ spliceConcat rs
+simplify (Alt [r]) = simplify r
+simplify (Alt rs) = Alt $ map simplify $ spliceAlt rs
 simplify (Star (Star r)) = Star $ simplify r
 simplify (Star (Plus r)) = Star $ simplify r
 simplify (Plus (Plus r)) = Plus $ simplify r
@@ -74,10 +88,6 @@ simplify (QuestionMark (Star r)) = Star $ simplify r
 simplify (Star (QuestionMark r)) = Star $ simplify r
 simplify (QuestionMark (Plus r)) = Star $ simplify r
 simplify (Plus (QuestionMark r)) = Star $ simplify r
-simplify Empty = Empty
-simplify (Lit a) = Lit a
-simplify (Concat rs) = Concat $ map simplify rs
-simplify (Alt rs) = Alt $ map simplify rs
 simplify (Star r) = Star $ simplify r
 simplify (Plus r) = Plus $ simplify r
 simplify (QuestionMark r) = QuestionMark $ simplify r
