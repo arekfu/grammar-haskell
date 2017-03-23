@@ -61,6 +61,7 @@ test-suite grammar-test
                      , vector
                      , QuickCheck
                      , deepseq
+                     , regex-tdfa
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-extensions:  DeriveGeneric
                      , DeriveAnyClass

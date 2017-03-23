@@ -6,9 +6,8 @@ import qualified MCTest
 
 main :: IO ()
 main = do
-    _ <- RegexRandomTest.printExamples
-    _ <- RegexTest.printExamples
     _ <- MCTest.runTests
+    _ <- RegexRandomTest.runTests
     _ <- RegexTest.runTests
     _ <- CFGTest.runTests
     _ <- CFGRandomTest.runTests
