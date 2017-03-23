@@ -11,7 +11,7 @@ This module contains the most important datatypes of the package and the
 functions that operate on them.
 -}
 
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, FlexibleInstances #-}
 
 module Grammar.CFG
 (
@@ -22,10 +22,8 @@ module Grammar.CFG
 -- $examplegrammar
 , showWord
 , showProductions
-, showProductionsBNF
 , showGrammarWith
 , showGrammar
-, showGrammarBNF
 -- * Context-free grammars over alphabets of integers
 , IntCFG(..)
 -- ** Type synonims
@@ -127,13 +125,11 @@ showWord :: Grammar g
          -> String      -- ^ the word, pretty-printed as a String
 showWord = concatMap showSymbol
 
-{- | Pretty-print all the production rules associated with a symbol.
+{- | Pretty-print all the production rules associated with a symbol, in
+     Backus-Naur form.
 
    >>> putStrLn $ showProductions exampleGrammar 'E'
-   E -> E+E
-   E -> E*E
-   E -> (E)
-   E -> I
+   E := E+E | E*E | (E) | I
 -}
 showProductions :: (Grammar g, Show (Repr g))
                 => g            -- ^ the grammar
@@ -141,22 +137,6 @@ showProductions :: (Grammar g, Show (Repr g))
                 -> String       -- ^ the pretty-printed production rule
 showProductions grammar sym = let header = showSymbol sym
                                   prod = productions grammar sym
-                               in case prod of
-                                      Nothing   -> ""
-                                      Just rule -> header ++ " -> " ++ showRegex rule ++ "\n"
-
-{- | Pretty-print all the production rules associated with a symbol, in
-     Backus-Naur form.
-
-   >>> putStrLn $ showProductionsBNF exampleGrammar 'E'
-   E := E+E | E*E | (E) | I
--}
-showProductionsBNF :: (Grammar g, Show (Repr g))
-                   => g            -- ^ the grammar
-                   -> Repr g       -- ^ the symbol on the left-hand side of the rule
-                   -> String       -- ^ the pretty-printed production rule
-showProductionsBNF grammar sym = let header = showSymbol sym
-                                     prod = productions grammar sym
                                in case prod of
                                       Nothing   -> ""
                                       Just rule -> header ++ " := " ++ showRegex rule ++ "\n"
@@ -179,40 +159,16 @@ showGrammarWith showProds grammar = let syms = S.toList $ getNonTerminals gramma
                                      in prods ++ start ++ terms ++ nonterms
 
 
-{- | Pretty-print all the production rules in a grammar.
+{- | Pretty-print all the production rules in a grammar, in Backus-Naur form.
 
    >>> putStrLn $ showGrammar exampleGrammar
-   E -> E+E
-   E -> E*E
-   E -> (E)
-   E -> I
-   I -> a
-   I -> b
-   I -> c
-   I -> Ia
-   I -> Ib
-   I -> Ic
-   I -> I0
-   I -> I1
-   I -> I2
-   I -> I3
+   E := E+E | E*E | (E) | I
+   I := a | b | c | Ia | Ib | Ic | I0 | I1 | I2 | I3
 -}
 showGrammar :: (Grammar g, Show (Repr g))
             => g                        -- ^ the grammar
             -> String                   -- ^ its pretty-printed representation as a String
 showGrammar = showGrammarWith showProductions
-
-
-{- | Pretty-print all the production rules in a grammar, in Backus-Naur form.
-
-   >>> putStrLn $ showGrammarBNF exampleGrammar
-   E := E+E | E*E | (E) | I
-   I := a | b | c | Ia | Ib | Ic | I0 | I1 | I2 | I3
--}
-showGrammarBNF :: (Grammar g, Show (Repr g))
-               => g                        -- ^ the grammar
-               -> String                   -- ^ its pretty-printed representation as a String
-showGrammarBNF = showGrammarWith showProductionsBNF
 
 
 
@@ -249,7 +205,7 @@ as "is this symbol terminal?".
 For efficiency reasons, the 'CFG' datatype is built upon an 'IntCFG'.
 -}
 
-data IntCFG = IntCFG Label Label (IM.IntMap (Regex Label)) deriving (Eq, Ord, Generic, NFData)
+data IntCFG = IntCFG Label Label (IM.IntMap (Regex Label)) deriving (Eq, Ord, Generic, NFData, Show)
 -- ^ The default constructor takes the next available label @n@, the label of
 -- the first nonterminal symbol and the 'Data.IntMap.IntMap' representing the
 -- production rules.
@@ -377,7 +333,6 @@ instance Grammar IntCFG where
     getNonTerminals = S.map ReprInt . getNonTerminalsInt
     startSymbol _ = ReprInt 0
 
-instance Show IntCFG where show = showGrammarBNF
 
 
 {- | A datatype representing context-free grammars over alphabets of arbitrary
@@ -395,7 +350,7 @@ represented by a 'Data.Vector.Vector', because labels are guaranteed to span a
 continuous range starting at @0@ (see 'IntCFG').
 -}
 data CFG a = CFG a IntCFG (SymbolToLabelDict a) (LabelToSymbolDict a)
-             deriving (Eq, Ord, Generic, NFData)
+             deriving (Eq, Ord, Generic, NFData, Show)
 
 type LabelToSymbolDict a = V.Vector a
 type SymbolToLabelDict a = M.Map a Label
@@ -539,7 +494,6 @@ instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     getNonTerminals = S.map ReprCFG . getNonTerminalsCFG
     startSymbol = ReprCFG . startSymbolCFG
 
-instance (Ord a, Show a) => Show (CFG a) where show = showGrammarBNF
 
 
 {- | A newtype for 'Char'-based context-free grammars. This is solely done to
@@ -551,10 +505,10 @@ instance (Ord a, Show a) => Show (CFG a) where show = showGrammarBNF
      >>> putStrLn $ showGrammar (productionsToCharCFG [('A', ["a"])])
      A := a
 -}
-newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord, Generic, NFData)
+newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord, Generic, NFData, Show)
 
 instance Grammar CharCFG where
-    data Repr CharCFG = ReprChar { unReprChar :: Char } deriving (Eq, Ord, Show)
+    data Repr CharCFG = ReprChar { unReprChar :: Char } deriving (Eq, Ord)
     productions (CharCFG g) (ReprChar c) = (fmap ReprChar) <$> productionsCFG g c
     showSymbol (ReprChar s) = [s]
     isInGrammar (ReprChar s) (CharCFG g) = isInCFG s g
@@ -566,11 +520,12 @@ instance Grammar CharCFG where
     getNonTerminals (CharCFG g) = S.map ReprChar $ getNonTerminalsCFG g
     startSymbol (CharCFG g) = ReprChar $ startSymbolCFG g
 
+instance Show (Repr CharCFG) where show (ReprChar c) = [c]
+
 -- | Build a 'CharCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
 productionsToCharCFG start = CharCFG . productionsToCFG start
 
-instance Show CharCFG where show = showGrammarBNF
 
 {- | A newtype for 'String'-based context-free grammars. This is solely done to
      improve the pretty-printing representation of the grammar labels.
@@ -581,10 +536,10 @@ instance Show CharCFG where show = showGrammarBNF
      >>> putStrLn $ showGrammar (productionsToStringCFG [("NONTERM", [["term"]])])
      NONTERM := term
 -}
-newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord, Generic, NFData)
+newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord, Generic, NFData, Show)
 
 instance Grammar StringCFG where
-    data Repr StringCFG = ReprString { unReprString :: String } deriving (Eq, Ord, Show)
+    data Repr StringCFG = ReprString { unReprString :: String } deriving (Eq, Ord)
     productions (StringCFG g) (ReprString s) = (fmap ReprString) <$> productionsCFG g s
     showSymbol (ReprString s) = s
     isInGrammar (ReprString s) (StringCFG g)= isInCFG s g
@@ -596,8 +551,8 @@ instance Grammar StringCFG where
     getNonTerminals (StringCFG g) = S.map ReprString $ getNonTerminalsCFG g
     startSymbol (StringCFG g) = ReprString $ startSymbolCFG g
 
+instance Show (Repr StringCFG) where show = unReprString
+
 -- | Build a 'StringCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG
 productionsToStringCFG start = StringCFG . productionsToCFG start
-
-instance Show StringCFG where show = showGrammarBNF

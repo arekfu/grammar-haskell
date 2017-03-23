@@ -1,6 +1,7 @@
 module Main where
 
 import Grammar
+import Grammar.CFG
 import Grammar.MC
 
 import System.Clock
@@ -27,11 +28,18 @@ digitsGrammar :: StringCFG
 digitsGrammar = productionsToStringCFG "<S>" digitsKeyValue
 
 main :: IO ()
-main = do print exampleGrammar
+main = do
+          -- example grammar
+          putStrLn $ showGrammar exampleGrammar
           let expansion = randomGrammarDeriveScan exampleGrammar
           TimeSpec _ seed <- getTime Realtime
           let strings = take 20 $ evalMC expansion $ fromIntegral seed
           mapM_ (putStrLn . showWord) strings
-          print digitsGrammar
+          putStrLn ""
+          -- digits grammar
+          putStrLn $ showGrammar digitsGrammar
           let digitExpansion = randomGrammarDerive digitsGrammar
           putStrLn $ showWord $ evalMC digitExpansion $ fromIntegral seed
+          putStrLn ""
+          -- examine the structureof the regexes
+          print $ productions digitsGrammar (ReprString "<D>")

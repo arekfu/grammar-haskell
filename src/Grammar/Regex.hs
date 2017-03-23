@@ -32,7 +32,7 @@ data Regex a = Empty                    -- ^ The empty regex, matches anything
              | Star (Regex a)           -- ^ Kleene star (0 or more)
              | Plus (Regex a)           -- ^ Kleene plus (1 or more)
              | QuestionMark (Regex a)   -- ^ Kleene question mark (0 or 1)
-             deriving (Eq, Ord, Generic, NFData)
+             deriving (Eq, Ord, Generic, NFData, Show)
 
 showRegex :: Show a => Regex a -> String
 showRegex Empty = ""
@@ -42,8 +42,6 @@ showRegex (Alt rs) = intercalate " | " $ map showRegex rs
 showRegex (Star r) = "(" ++ show r ++ ")*"
 showRegex (Plus r) = "(" ++ show r ++ ")+"
 showRegex (QuestionMark r) = "(" ++ show r ++ ")?"
-
-instance Show a => Show (Regex a) where show = showRegex
 
 instance Functor Regex where
     fmap _ Empty = Empty
