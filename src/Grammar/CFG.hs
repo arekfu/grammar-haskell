@@ -31,7 +31,6 @@ module Grammar.CFG
 , InverseRelabelling
 , Relabelling
 -- ** Manipulators
-, productionsToIntMap
 , intMapToIntCFG
 , productionsToIntCFG
 , renumberLabel
@@ -277,7 +276,7 @@ collectLabels =
      'Data.Vector.Unboxed.Vector' 'Label' indexed by the renumbered labels.
 -}
 productionsToIntCFG :: Label -> [(Label, Regex Label)] -> (IntCFG, InverseRelabelling, Relabelling)
-productionsToIntCFG start = intMapToIntCFG start . productionsToIntMap
+productionsToIntCFG start = intMapToIntCFG start . IM.map simplify . IM.fromList
 
 {- | Build an 'IntCFG' from an 'Data.IntMap.IntMap' between 'Label's. The
      'Labels' will be renumbered as specified in the second and third return
@@ -310,13 +309,6 @@ renumberMap start intMap =
         intMap' = IM.mapKeys (renumberLabel relabelling) intMap
         intMap'' = fmap (renumberLabels relabelling) intMap'
      in (intMap'', inverseRelabelling, relabelling)
-
-{- | Provide the fundamental building block to construct an 'IntCFG' from an
-     association list of @(nonterminal, productions)@ pairs. The Labels are
-     not guaranteed to span the @[0,n-1]@ range.
--}
-productionsToIntMap :: [(Label, Regex Label)] -> IM.IntMap (Regex Label)
-productionsToIntMap = IM.fromList
 
 instance Grammar IntCFG where
     data Repr IntCFG = ReprInt { unReprInt :: Label } deriving (Eq, Ord, Show)
