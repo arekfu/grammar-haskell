@@ -123,9 +123,9 @@ delegateCFGToIntCFG :: (Functor f, Ord b)
                     -> f (Repr (CFG b))
                     -> MC (f (Repr (CFG b)))
 delegateCFGToIntCFG action (CFG _ iGr s2l l2s) word =
-    let labelWord = ReprInt <$> (symbolsToLabels s2l (unReprCFG <$> word))
+    let labelWord = ReprInt <$> symbolsToLabels s2l (unReprCFG <$> word)
      in do derived <- action iGr labelWord
-           return (ReprCFG <$> (labelsToSymbols l2s (unReprInt <$> derived)))
+           return (ReprCFG <$> labelsToSymbols l2s (unReprInt <$> derived))
 
 delegateCFGToIntCFG2 :: (Functor f, Ord b)
                      => (forall g. RandomGrammar g => g -> f (Repr g) -> MC (f (f (Repr g))))
@@ -133,41 +133,35 @@ delegateCFGToIntCFG2 :: (Functor f, Ord b)
                      -> f (Repr (CFG b))
                      -> MC (f (f (Repr (CFG b))))
 delegateCFGToIntCFG2 action (CFG _ iGr s2l l2s) regex =
-    let labelRegex = ReprInt <$> (symbolsToLabels s2l $ (unReprCFG <$> regex))
+    let labelRegex = ReprInt <$> symbolsToLabels s2l (unReprCFG <$> regex)
      in do derived <- action iGr labelRegex
-           return ((fmap ReprCFG) <$> (fmap (labelsToSymbols l2s) ((fmap unReprInt) <$> derived)))
+           return (fmap ReprCFG <$> fmap (labelsToSymbols l2s) (fmap unReprInt <$> derived))
 
 instance RandomGrammar IntCFG
 
 instance (Ord a, Show a) => RandomGrammar (CFG a) where
-    randomWordDerive grammar word = delegateCFGToIntCFG randomWordDerive grammar word
-    randomWordDeriveN n grammar word = delegateCFGToIntCFG (randomWordDeriveN n) grammar word
-    randomWordDeriveScan grammar word = delegateCFGToIntCFG2 randomWordDeriveScan grammar word
+    randomWordDerive = delegateCFGToIntCFG randomWordDerive
+    randomWordDeriveN n = delegateCFGToIntCFG (randomWordDeriveN n)
+    randomWordDeriveScan = delegateCFGToIntCFG2 randomWordDeriveScan
 
 instance RandomGrammar CharCFG where
     randomWordDerive (CharCFG g) word =
         map (ReprChar . unReprCFG)
-            <$> (delegateCFGToIntCFG randomWordDerive g
-                $ map (ReprCFG . unReprChar) word)
+            <$> delegateCFGToIntCFG randomWordDerive g (map (ReprCFG . unReprChar) word)
     randomWordDeriveN n (CharCFG g) word =
         map (ReprChar . unReprCFG)
-            <$> (delegateCFGToIntCFG (randomWordDeriveN n) g
-                $ map (ReprCFG . unReprChar) word)
+            <$> delegateCFGToIntCFG (randomWordDeriveN n) g (map (ReprCFG . unReprChar) word)
     randomWordDeriveScan (CharCFG g) word =
         map (map (ReprChar . unReprCFG))
-            <$> (delegateCFGToIntCFG2 randomWordDeriveScan g
-                $ map (ReprCFG . unReprChar) word)
+            <$> delegateCFGToIntCFG2 randomWordDeriveScan g (map (ReprCFG . unReprChar) word)
 
 instance RandomGrammar StringCFG where
     randomWordDerive (StringCFG g) word =
         map (ReprString . unReprCFG)
-            <$> (delegateCFGToIntCFG randomWordDerive g
-                $ map (ReprCFG . unReprString) word)
+            <$> delegateCFGToIntCFG randomWordDerive g (map (ReprCFG . unReprString) word)
     randomWordDeriveN n (StringCFG g) word =
         map (ReprString . unReprCFG)
-            <$> (delegateCFGToIntCFG (randomWordDeriveN n) g
-                $ map (ReprCFG . unReprString) word)
+            <$> delegateCFGToIntCFG (randomWordDeriveN n) g (map (ReprCFG . unReprString) word)
     randomWordDeriveScan (StringCFG g) word =
         map (map (ReprString . unReprCFG))
-            <$> (delegateCFGToIntCFG2 randomWordDeriveScan g
-                $ map (ReprCFG . unReprString) word)
+            <$> delegateCFGToIntCFG2 randomWordDeriveScan g (map (ReprCFG . unReprString) word)

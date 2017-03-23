@@ -23,7 +23,7 @@ printExamples = do putStrLn "Performing random expansion of some random regexes.
                    forM_ ars $ \ar -> do
                      let r = unARegex ar
                      putStrLn $ "Expanding regex " ++ show r
-                     forM_ ((coerce seeds)::[Seed]) $ \seed -> do
+                     forM_ (coerce seeds :: [Seed]) $ \seed ->
                          putStrLn $ concatMap show $ evalMC (randomExpandRegex r) seed
 
 prop_randomExpansionMatches :: ARegex NonTerminal -> Positive (Large Seed) -> Property
@@ -33,8 +33,8 @@ prop_randomExpansionMatches (ARegex regex) (Positive (Large seed)) =
         tregex = showRegexWith (\(NonTerminal nt) -> [nt]) regex
         match :: Bool
         match = expanded =~ tregex
-     in counterexample ("Counterexample: \"" ++ expanded ++ "\" does not match \"" ++ tregex ++ "\"") $
-        match
+     in counterexample ("Counterexample: \"" ++ expanded ++ "\" does not match \"" ++ tregex ++ "\"")
+          match
 
 
 return []

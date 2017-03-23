@@ -31,7 +31,7 @@ expConstant = 3.0
 randomExpandRegex :: Regex a -> MC [a]
 randomExpandRegex Empty = return []
 randomExpandRegex (Lit x) = return [x]
-randomExpandRegex (Concat xs) = concat <$> (sequence $ map randomExpandRegex xs)
+randomExpandRegex (Concat xs) = concat <$> mapM randomExpandRegex xs
 randomExpandRegex (Alt xs) = randomExpandRegex =<< pickRandom xs
 randomExpandRegex (Star r) = do xi <- sampleExp expConstant
                                 expanded <- randomExpandRegex r

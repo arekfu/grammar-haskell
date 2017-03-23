@@ -314,7 +314,7 @@ instance Grammar IntCFG where
     data Repr IntCFG = ReprInt { unReprInt :: Label } deriving (Eq, Ord, Show)
     -- all the instance declarations do is actually wrap and unwrap the Repr
     -- datatype
-    productions g (ReprInt sym) = (fmap ReprInt) <$> productionsInt g sym
+    productions g (ReprInt sym) = fmap ReprInt <$> productionsInt g sym
     showSymbol (ReprInt sym) = show sym
     isInGrammar (ReprInt sym) = isInIntCFG sym
     isNotInGrammar (ReprInt sym) = isNotInIntCFG sym
@@ -475,7 +475,7 @@ startSymbolCFG (CFG start _ _ _) = start
 
 instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     data Repr (CFG a) = ReprCFG { unReprCFG :: a } deriving (Eq, Ord, Show)
-    productions grammar (ReprCFG s) = (fmap ReprCFG) <$> productionsCFG grammar s
+    productions grammar (ReprCFG s) = fmap ReprCFG <$> productionsCFG grammar s
     showSymbol = show
     isInGrammar (ReprCFG s) = isInCFG s
     isNotInGrammar (ReprCFG s) = isNotInCFG s
@@ -501,7 +501,7 @@ newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord, Generic, NFData, Show)
 
 instance Grammar CharCFG where
     data Repr CharCFG = ReprChar { unReprChar :: Char } deriving (Eq, Ord)
-    productions (CharCFG g) (ReprChar c) = (fmap ReprChar) <$> productionsCFG g c
+    productions (CharCFG g) (ReprChar c) = fmap ReprChar <$> productionsCFG g c
     showSymbol (ReprChar s) = [s]
     isInGrammar (ReprChar s) (CharCFG g) = isInCFG s g
     isNotInGrammar (ReprChar s) (CharCFG g) = isNotInCFG s g
@@ -532,7 +532,7 @@ newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord, Generic, NFData, S
 
 instance Grammar StringCFG where
     data Repr StringCFG = ReprString { unReprString :: String } deriving (Eq, Ord)
-    productions (StringCFG g) (ReprString s) = (fmap ReprString) <$> productionsCFG g s
+    productions (StringCFG g) (ReprString s) = fmap ReprString <$> productionsCFG g s
     showSymbol (ReprString s) = s
     isInGrammar (ReprString s) (StringCFG g)= isInCFG s g
     isNotInGrammar (ReprString s) (StringCFG g) = isNotInCFG s g

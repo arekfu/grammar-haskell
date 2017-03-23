@@ -42,10 +42,10 @@ showRegexWith :: (a -> String) -> Regex a -> String
 showRegexWith _ Empty = ""
 showRegexWith s (Lit a) = s a
 showRegexWith s (Concat rs) = "(" ++ concatMap (showRegexWith s) rs ++ ")"
-showRegexWith s (Alt rs) = "(" ++ (intercalate "|" $ map (showRegexWith s) rs) ++ ")"
-showRegexWith s (Star r) = "(" ++ (showRegexWith s) r ++ ")*"
-showRegexWith s (Plus r) = "(" ++ (showRegexWith s) r ++ ")+"
-showRegexWith s (QuestionMark r) = "(" ++ (showRegexWith s) r ++ ")?"
+showRegexWith s (Alt rs) = "(" ++ intercalate "|" (map (showRegexWith s) rs) ++ ")"
+showRegexWith s (Star r) = "(" ++ showRegexWith s r ++ ")*"
+showRegexWith s (Plus r) = "(" ++ showRegexWith s r ++ ")+"
+showRegexWith s (QuestionMark r) = "(" ++ showRegexWith s r ++ ")?"
 
 showRegex :: Show a => Regex a -> String
 showRegex = showRegexWith show
@@ -75,12 +75,12 @@ instance Foldable Regex where
     foldMap f (QuestionMark r) = foldMap f r
 
 spliceConcat :: [Regex a] -> [Regex a]
-spliceConcat ((Concat rs):rest) = rs ++ spliceConcat rest
+spliceConcat (Concat rs : rest) = rs ++ spliceConcat rest
 spliceConcat (r:rs) = r : spliceConcat rs
 spliceConcat [] = []
 
 spliceAlt :: [Regex a] -> [Regex a]
-spliceAlt ((Alt rs):rest) = rs ++ spliceAlt rest
+spliceAlt (Alt rs : rest) = rs ++ spliceAlt rest
 spliceAlt (r:rs) = r : spliceAlt rs
 spliceAlt [] = []
 
