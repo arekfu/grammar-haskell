@@ -28,7 +28,10 @@ module Grammar.MC
 
 -- system imports
 import Control.Monad.State
-import System.Random
+import System.Random.TF
+import System.Random.TF.Gen
+import System.Random.TF.Instances
+import Data.Int
 import Data.Foldable (Foldable, length, toList)
 
 --------------------
@@ -39,7 +42,10 @@ import Data.Foldable (Foldable, length, toList)
 type Seed = Int
 
 -- | The 'MC' type is just an alias for the 'State' 'StdGen' monad. Yes, 'MC' stands for Monte Carlo.
-type MC = State StdGen
+type MC = State TFGen
+
+oneOverMaxInt64 :: Fractional a => a
+oneOverMaxInt64 = 1.0 / fromIntegral (maxBound::Int64)
 
 {- | How do I escape from the 'MC' monad? Just call evalGrammar and supply a
    starting seed for the pseudo-random number generator.
@@ -47,31 +53,32 @@ type MC = State StdGen
 evalMC :: MC a -- ^ the computation to perform
        -> Seed -- ^ the starting seed
        -> a    -- ^ the computation result
-evalMC obj seed = let initialGen = mkStdGen seed
+evalMC obj seed = let initialGen = mkTFGen seed
                    in evalState obj initialGen
 
 -----------------------------------------------
 --  some machinery to sample random numbers  --
 -----------------------------------------------
 
-getGen :: MonadState StdGen m => m StdGen
+getGen :: (RandomGen g, MonadState g m) => m g
 getGen = get
 
-uniform :: (Random a, Fractional a, MonadState StdGen m) => m a
+uniform :: (RandomGen g, Fractional a, MonadState g m) => m a
 uniform = do
     gen <- getGen
-    let (xi, gen') = randomR (0.0, 1.0) gen
+    let (i, gen') = random gen
+    let xi = fromIntegral (i::Int64) * oneOverMaxInt64
     put gen'
     return xi
 
-uniformInt :: (Random a, Integral a, MonadState StdGen m) => a -> a -> m a
+uniformInt :: (RandomGen g, Random a, Integral a, MonadState g m) => a -> a -> m a
 uniformInt minVal maxVal = do
     gen <- getGen
     let (xi, gen') = randomR (minVal, maxVal) gen
     put gen'
     return xi
 
-uniforms :: (Random a, Fractional a, MonadState StdGen m)
+uniforms :: (RandomGen g, Random a, Fractional a, MonadState g m)
          => Int
          -> m [a]
 uniforms n = replicateM n uniform
@@ -80,9 +87,9 @@ uniforms n = replicateM n uniform
 -- @
 -- f(x) = exp(-&#x3BB; x)/&#x3BB;
 -- @
-sampleExp :: (Random a, Floating a, MonadState StdGen m)
-          => a  -- ^ The distribution mean
-          -> m a
+sampleExp :: (RandomGen g, MonadState g m)
+          => Double  -- ^ The distribution mean
+          -> m Double
 sampleExp lambda = do xi <- uniform
                       return $ (-lambda) * log xi
 
