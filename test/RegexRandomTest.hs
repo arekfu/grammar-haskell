@@ -10,7 +10,7 @@ import Data.Coerce
 -- local imports
 import Grammar.MC
 import Grammar.Regex.Random
-import CFGTest (NonTerminal)
+import SymbolsTest (NonTerminal(..))
 import RegexTest (ARegex(..))
 
 printExamples :: IO ()

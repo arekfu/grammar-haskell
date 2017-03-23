@@ -1,7 +1,5 @@
 module CFGTest
 ( runTests
-, Terminal(..)
-, NonTerminal(..)
 , ACharCFG(..)
 ) where
 
