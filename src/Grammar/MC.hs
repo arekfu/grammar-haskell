@@ -66,7 +66,7 @@ getGen = get
 uniform :: (RandomGen g, Fractional a, MonadState g m) => m a
 uniform = do
     gen <- getGen
-    let (i, gen') = random gen
+    let (i, gen') = randomR (1, maxBound::Int64) gen
     let xi = fromIntegral (i::Int64) * oneOverMaxInt64
     put gen'
     return xi
@@ -78,7 +78,7 @@ uniformInt minVal maxVal = do
     put gen'
     return xi
 
-uniforms :: (RandomGen g, Random a, Fractional a, MonadState g m)
+uniforms :: (RandomGen g, Fractional a, MonadState g m)
          => Int
          -> m [a]
 uniforms n = replicateM n uniform

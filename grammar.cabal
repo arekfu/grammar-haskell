@@ -54,6 +54,7 @@ test-suite grammar-test
                      , RegexTest
                      , RegexRandomTest
                      , SymbolsTest
+                     , MCTest
   build-depends:       base
                      , grammar
                      , containers
