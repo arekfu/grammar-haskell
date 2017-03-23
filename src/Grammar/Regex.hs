@@ -14,6 +14,9 @@ context-free grammars.
 module Grammar.Regex
 ( Regex(..)
 , showRegex
+, showRegexWith
+, showRegexChar
+, showRegexString
 , simplify
 ) where
 
@@ -35,14 +38,23 @@ data Regex a = Empty                    -- ^ The empty regex, matches anything
              | QuestionMark (Regex a)   -- ^ Kleene question mark (0 or 1)
              deriving (Eq, Ord, Generic, NFData, Show)
 
+showRegexWith :: (a -> String) -> Regex a -> String
+showRegexWith _ Empty = ""
+showRegexWith s (Lit a) = s a
+showRegexWith s (Concat rs) = "(" ++ concatMap (showRegexWith s) rs ++ ")"
+showRegexWith s (Alt rs) = "(" ++ (intercalate "|" $ map (showRegexWith s) rs) ++ ")"
+showRegexWith s (Star r) = "(" ++ (showRegexWith s) r ++ ")*"
+showRegexWith s (Plus r) = "(" ++ (showRegexWith s) r ++ ")+"
+showRegexWith s (QuestionMark r) = "(" ++ (showRegexWith s) r ++ ")?"
+
 showRegex :: Show a => Regex a -> String
-showRegex Empty = ""
-showRegex (Lit a) = show a
-showRegex (Concat rs) = concatMap showRegex rs
-showRegex (Alt rs) = intercalate " | " $ map showRegex rs
-showRegex (Star r) = "(" ++ show r ++ ")*"
-showRegex (Plus r) = "(" ++ show r ++ ")+"
-showRegex (QuestionMark r) = "(" ++ show r ++ ")?"
+showRegex = showRegexWith show
+
+showRegexChar :: Regex Char -> String
+showRegexChar = showRegexWith (:[])
+
+showRegexString :: Regex String -> String
+showRegexString = showRegexWith id
 
 instance Functor Regex where
     fmap _ Empty = Empty
