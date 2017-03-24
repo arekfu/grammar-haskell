@@ -22,6 +22,7 @@ library
                      , Grammar.CFG
                      , Grammar.CFG.Random
                      , Grammar.Regex
+                     , Grammar.Regex.Parse
                      , Grammar.Regex.Random
   build-depends:       base >= 4.7 && < 5
                      , containers
@@ -29,6 +30,7 @@ library
                      , mtl
                      , vector
                      , deepseq
+                     , parsec
   default-extensions:  DeriveGeneric
                      , DeriveAnyClass
                      , FlexibleContexts
