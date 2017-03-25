@@ -30,7 +30,7 @@ prop_randomExpansionMatches :: ARegex NonTerminal -> Positive (Large Seed) -> Pr
 prop_randomExpansionMatches (ARegex regex) (Positive (Large seed)) =
     let expanded :: String
         expanded = coerce $ evalMC (randomExpandRegex regex) seed
-        tregex = showRegexWith (\(NonTerminal nt) -> [nt]) regex
+        tregex = showRegexWith "" (\(NonTerminal nt) -> [nt]) regex
         match :: Bool
         match = expanded =~ tregex
      in counterexample ("Counterexample: \"" ++ expanded ++ "\" does not match \"" ++ tregex ++ "\"")
