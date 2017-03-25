@@ -88,22 +88,29 @@ spliceAlt (Alt rs : rest) = rs ++ spliceAlt rest
 spliceAlt (r:rs) = r : spliceAlt rs
 spliceAlt [] = []
 
-simplify :: Regex a -> Regex a
-simplify Empty = Empty
-simplify (Lit a) = Lit a
-simplify (Concat [r]) = simplify r
-simplify (Concat rs) = Concat $ map simplify $ spliceConcat rs
-simplify (Alt [r]) = simplify r
-simplify (Alt rs) = Alt $ map simplify $ spliceAlt rs
-simplify (Star (Star r)) = Star $ simplify r
-simplify (Star (Plus r)) = Star $ simplify r
-simplify (Plus (Plus r)) = Plus $ simplify r
-simplify (Plus (Star r)) = Star $ simplify r
-simplify (QuestionMark (QuestionMark r)) = QuestionMark $ simplify r
-simplify (QuestionMark (Star r)) = Star $ simplify r
-simplify (Star (QuestionMark r)) = Star $ simplify r
-simplify (QuestionMark (Plus r)) = Star $ simplify r
-simplify (Plus (QuestionMark r)) = Star $ simplify r
-simplify (Star r) = Star $ simplify r
-simplify (Plus r) = Plus $ simplify r
-simplify (QuestionMark r) = QuestionMark $ simplify r
+fix :: Eq a => (a -> a) -> a -> a
+fix f x = let x' = f x
+           in if x == x' then x else fix f x'
+
+simplify :: Eq a => Regex a -> Regex a
+simplify = fix simplify'
+
+simplify' :: Regex a -> Regex a
+simplify' Empty = Empty
+simplify' (Lit a) = Lit a
+simplify' (Concat [r]) = simplify' r
+simplify' (Concat rs) = Concat $ map simplify' $ spliceConcat rs
+simplify' (Alt [r]) = simplify' r
+simplify' (Alt rs) = Alt $ map simplify' $ spliceAlt rs
+simplify' (Star (Star r)) = Star $ simplify' r
+simplify' (Star (Plus r)) = Star $ simplify' r
+simplify' (Plus (Plus r)) = Plus $ simplify' r
+simplify' (Plus (Star r)) = Star $ simplify' r
+simplify' (QuestionMark (QuestionMark r)) = QuestionMark $ simplify' r
+simplify' (QuestionMark (Star r)) = Star $ simplify' r
+simplify' (Star (QuestionMark r)) = Star $ simplify' r
+simplify' (QuestionMark (Plus r)) = Star $ simplify' r
+simplify' (Plus (QuestionMark r)) = Star $ simplify' r
+simplify' (Star r) = Star $ simplify' r
+simplify' (Plus r) = Plus $ simplify' r
+simplify' (QuestionMark r) = QuestionMark $ simplify' r
