@@ -18,6 +18,8 @@ module Grammar.Regex
 , showRegexQuoted
 , showRegexChar
 , showRegexString
+, needsBracketsWithin
+, bracketed
 , simplify
 ) where
 
@@ -32,21 +34,43 @@ import Data.Foldable (Foldable)
 -}
 data Regex a = Empty                    -- ^ The empty regex, matches anything
              | Lit a                    -- ^ A literal
+             | QuestionMark (Regex a)   -- ^ Kleene question mark (0 or 1)
+             | Plus (Regex a)           -- ^ Kleene plus (1 or more)
+             | Star (Regex a)           -- ^ Kleene star (0 or more)
              | Concat [Regex a]         -- ^ Concatenation of regexes
              | Alt [Regex a]            -- ^ Disjunction of regexes
-             | Star (Regex a)           -- ^ Kleene star (0 or more)
-             | Plus (Regex a)           -- ^ Kleene plus (1 or more)
-             | QuestionMark (Regex a)   -- ^ Kleene question mark (0 or 1)
              deriving (Eq, Ord, Generic, NFData, Show)
+
+needsBracketsWithin :: Regex a -> Regex a -> Bool
+(Alt _) `needsBracketsWithin` _ = True
+(Concat _) `needsBracketsWithin` (Star _) = True
+(Concat _) `needsBracketsWithin` (Plus _) = True
+(Concat _) `needsBracketsWithin` (QuestionMark _) = True
+(Star _) `needsBracketsWithin` (Star _) = True
+(Star _) `needsBracketsWithin` (Plus _) = True
+(Star _) `needsBracketsWithin` (QuestionMark _) = True
+(Star _) `needsBracketsWithin` (Concat _) = True
+(Plus _) `needsBracketsWithin` (Star _) = True
+(Plus _) `needsBracketsWithin` (Plus _) = True
+(Plus _) `needsBracketsWithin` (QuestionMark _) = True
+(QuestionMark _) `needsBracketsWithin` (Star _) = True
+(QuestionMark _) `needsBracketsWithin` (Plus _) = True
+(QuestionMark _) `needsBracketsWithin` (QuestionMark _) = True
+_ `needsBracketsWithin` _ = False
+
+bracketed :: Regex a -> Regex a -> String -> String
+bracketed r0 r1 s = if r0 `needsBracketsWithin` r1
+                    then "(" ++ s ++ ")"
+                    else s
 
 showRegexWith :: String -> (a -> String) -> Regex a -> String
 showRegexWith n _ Empty = n
 showRegexWith _ s (Lit a) = s a
-showRegexWith n s (Concat rs) = "(" ++ concatMap (showRegexWith n s) rs ++ ")"
-showRegexWith n s (Alt rs) = "(" ++ intercalate "|" (map (showRegexWith n s) rs) ++ ")"
-showRegexWith n s (Star r) = "(" ++ showRegexWith n s r ++ ")*"
-showRegexWith n s (Plus r) = "(" ++ showRegexWith n s r ++ ")+"
-showRegexWith n s (QuestionMark r) = "(" ++ showRegexWith n s r ++ ")?"
+showRegexWith n s r0@(Star r) = bracketed r r0 (showRegexWith n s r) ++ "*"
+showRegexWith n s r0@(Plus r) = bracketed r  r0 (showRegexWith n s r) ++ "+"
+showRegexWith n s r0@(QuestionMark r) = bracketed r r0 (showRegexWith n s r) ++ "?"
+showRegexWith n s r0@(Concat rs) = concatMap (\r -> bracketed r r0 $ showRegexWith n s r) rs
+showRegexWith n s r0@(Alt rs) = intercalate "|" $ map (\r -> bracketed r r0 $ showRegexWith n s r) rs
 
 showRegex :: Show a => Regex a -> String
 showRegex = showRegexWith "" show
