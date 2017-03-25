@@ -1,5 +1,5 @@
 module Grammar.Regex.Parse
-( regex
+( regexParser
 ) where
 
 -- system imports
@@ -12,8 +12,8 @@ import Grammar.Regex
 parens :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
 parens = between (char '(')  (char ')')
 
-regex :: Stream s m Char => ParsecT s u m (Regex Char)
-regex = alt <* (choice [void newline, eof] <?> "end of input")
+regexParser :: Stream s m Char => ParsecT s u m (Regex Char)
+regexParser = alt <* (choice [void newline, eof] <?> "end of input")
 
 alt :: Stream s m Char => ParsecT s u m (Regex Char)
 alt = do r <- sepBy1 concatenation (char '|')

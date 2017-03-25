@@ -64,6 +64,7 @@ test-suite grammar-test
                      , QuickCheck
                      , deepseq
                      , regex-tdfa
+                     , parsec
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-extensions:  DeriveGeneric
                      , DeriveAnyClass

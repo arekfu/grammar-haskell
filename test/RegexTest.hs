@@ -12,10 +12,12 @@ import Test.QuickCheck.Function
 import Data.Foldable
 import Data.Coerce
 import Data.Monoid (Sum, Endo(..), Dual(..), appEndo, getDual)
+import Text.Parsec hiding (Empty)
 
 -- local imports
-import SymbolsTest (NonTerminal)
+import SymbolsTest (NonTerminal(..))
 import Grammar.Regex
+import Grammar.Regex.Parse
 
 
 newtype ARegex a = ARegex { unARegex :: Regex a } deriving (Eq, Ord, Show)
@@ -40,6 +42,16 @@ instance Arbitrary a => Arbitrary (ARegex a) where
     shrink (ARegex (Plus r))         = [ARegex Empty, ARegex r]
     shrink (ARegex (QuestionMark r)) = [ARegex Empty, ARegex r]
 
+
+prop_parseShowIdempotence :: ARegex NonTerminal -> Property
+prop_parseShowIdempotence (ARegex r) =
+    let r' = coerce r
+        rstr = showRegexQuoted r'
+     in case parse regexParser "parseShowIdempotence" rstr of
+            Left parseError -> counterexample ("Parsing failed\n  regex: " ++ rstr ++ "\n  error: " ++ show parseError) False
+            Right r'' -> r' === r''
+
+
 prop_functorLaw1 :: (Eq a, Show a) => ARegex a -> Property
 prop_functorLaw1 (ARegex regex) =
     fmap id regex === regex
@@ -60,11 +72,11 @@ prop_foldableLaw2 (Fun _ f) z (ARegex regex) =
     let f' = apply . f
      in foldr f' z regex === appEndo (foldMap (Endo . f') regex) z
 
+
 prop_foldableLaw3 :: Fun Int (Fun Char Int) -> Int -> ARegex Char -> Property
 prop_foldableLaw3 (Fun _ f) z (ARegex regex) =
     let f' = apply . f
      in foldl f' z regex === appEndo (getDual (foldMap (Dual . Endo . flip f') regex)) z
-
 
 
 printExamples :: IO ()
