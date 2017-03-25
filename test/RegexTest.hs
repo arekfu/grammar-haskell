@@ -49,8 +49,11 @@ prop_parseShowIdempotence (ARegex r) =
         rstr = showRegexQuoted r'
      in case parse regexParser "parseShowIdempotence" rstr of
             Left parseError -> counterexample ("Parsing failed\n  regex: " ++ rstr ++ "\n  error: " ++ show parseError) False
-            Right r'' -> r' === r''
+            Right r'' -> simplify r' === simplify r''
 
+
+prop_simplifyIdempotence :: ARegex NonTerminal -> Property
+prop_simplifyIdempotence (ARegex r) = let r' = simplify r in r' === simplify r'
 
 prop_functorLaw1 :: (Eq a, Show a) => ARegex a -> Property
 prop_functorLaw1 (ARegex regex) =
@@ -77,6 +80,7 @@ prop_foldableLaw3 :: Fun Int (Fun Char Int) -> Int -> ARegex Char -> Property
 prop_foldableLaw3 (Fun _ f) z (ARegex regex) =
     let f' = apply . f
      in foldl f' z regex === appEndo (getDual (foldMap (Dual . Endo . flip f') regex)) z
+
 
 
 printExamples :: IO ()
