@@ -1,5 +1,8 @@
 module Grammar.Regex.Parse
 ( regexParser
+, whitespace
+, lexeme
+, symbol
 ) where
 
 -- system imports
@@ -10,7 +13,7 @@ import Control.Monad (void)
 import Grammar.Regex
 
 whitespace :: Stream s m Char => ParsecT s u m ()
-whitespace = spaces
+whitespace = skipMany $ oneOf [' ', '\t']
 
 -- | Modify a parser to skip any following whitespace
 lexeme :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
@@ -51,14 +54,17 @@ questionMark :: Stream s m Char => ParsecT s u m (Regex Char -> Regex Char)
 questionMark = lexeme(char '?') *> return QuestionMark
 
 unit :: Stream s m Char => ParsecT s u m (Regex Char)
-unit = parens alt <|> lexeme symbol
+unit = parens alt <|> lexeme symbolOrEmpty
 
-symbol :: Stream s m Char => ParsecT s u m (Regex Char)
-symbol = char '<' *> choice [empty, lit] <?> "identifier"
+symbolOrEmpty :: Stream s m Char => ParsecT s u m (Regex Char)
+symbolOrEmpty = char '<' *> choice [empty, Lit <$> lit] <?> "identifier or empty"
+
+symbol :: Stream s m Char => ParsecT s u m Char
+symbol = char '<' *> lit <?> "identifier"
 
 empty :: Stream s m Char => ParsecT s u m (Regex Char)
 empty = char '>' *> pure Empty
 
-lit :: Stream s m Char => ParsecT s u m (Regex Char)
-lit = Lit <$> noneOf ['\"', '<', '>', '(', ')', '*', '+', '?', '|']
+lit :: Stream s m Char => ParsecT s u m Char
+lit = noneOf ['\"', '<', '>', '(', ')', '*', '+', '?', '|']
                 <* char '>' <?> "quote at the end of symbol"

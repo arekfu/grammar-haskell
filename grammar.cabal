@@ -20,6 +20,7 @@ library
                      , Grammar.ParseTree
                      , Grammar.MC
                      , Grammar.CFG
+                     , Grammar.CFG.Parse
                      , Grammar.CFG.Random
                      , Grammar.Regex
                      , Grammar.Regex.Parse

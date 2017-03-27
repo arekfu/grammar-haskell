@@ -43,7 +43,9 @@ module Grammar.CFG
 , CFG(..)
 , Repr(..)
 , productionsToCFG
+, regexesToCFG
 , gatherAllSymbols
+, harvestAllSymbols
 , labelAllSymbols
 , toSymbol
 , toLabel
@@ -382,6 +384,10 @@ gatherAllSymbols = foldr' insertKeyValue S.empty
     where insertKeyValue :: Ord a => (a, [[a]]) -> S.Set a -> S.Set a
           insertKeyValue (k, vs) set = foldr' S.insert (S.insert k set) $ concat vs
 
+-- | Extract all the symbols from an association list of regexes.
+harvestAllSymbols :: Ord a => [(a, Regex a)] -> S.Set a
+harvestAllSymbols = foldr' (S.union . (harvest . snd)) S.empty
+
 {- | Given a list of production rules in the form of an association list,
      associate a label to each mentioned symbol and return an association list
      of labels, along with dictionaries to translate symbols to labels and
@@ -389,15 +395,37 @@ gatherAllSymbols = foldr' insertKeyValue S.empty
 -}
 labelAllSymbols :: Ord a => [(a, [[a]])] -> ([(Label, Regex Label)], LabelToSymbolDict a, SymbolToLabelDict a)
 labelAllSymbols kvs = let allSymbols = gatherAllSymbols kvs
-                          labelsToSymbolsDict = V.fromList $ S.toList allSymbols
-                          symbolsToLabelsDict = invertSymbolToLabelDict labelsToSymbolsDict
-                          labelledAssocList = labelKeyValues kvs symbolsToLabelsDict
+                          (labelsToSymbolsDict, symbolsToLabelsDict) = labelSymbols allSymbols
+                          keyRegex = keyValuesToKeyRegex kvs
+                          labelledAssocList = labelKeyValues keyRegex symbolsToLabelsDict
                        in (labelledAssocList, labelsToSymbolsDict, symbolsToLabelsDict)
 
-labelKeyValues :: Ord a => [(a, [[a]])] -> SymbolToLabelDict a -> [(Label, Regex Label)]
+{- | Given a list of production rules in the form of @(symbol, regex)@ pairs,
+     associate a label to each mentioned symbol and return an association list
+     of labels, along with dictionaries to translate symbols to labels and
+     vice-versa.
+-}
+labelAllRegexes :: Ord a => [(a, Regex a)] -> ([(Label, Regex Label)], LabelToSymbolDict a, SymbolToLabelDict a)
+labelAllRegexes rs = let allSymbols = harvestAllSymbols rs
+                         (labelsToSymbolsDict, symbolsToLabelsDict) = labelSymbols allSymbols
+                         labelledAssocList = labelKeyValues rs symbolsToLabelsDict
+                      in (labelledAssocList, labelsToSymbolsDict, symbolsToLabelsDict)
+
+{- | Given a 'Data.Set.Set' of symbols, assign a 'Label' to each of them and
+     return the corresponding symbol-to-label and label-to-symbol mappings.
+-}
+labelSymbols :: Ord a => S.Set a -> (LabelToSymbolDict a, SymbolToLabelDict a)
+labelSymbols allSymbols = let labelsToSymbolsDict = V.fromList $ S.toList allSymbols
+                              symbolsToLabelsDict = invertSymbolToLabelDict labelsToSymbolsDict
+                           in (labelsToSymbolsDict, symbolsToLabelsDict)
+
+keyValuesToKeyRegex :: Ord a => [(a, [[a]])] -> [(a, Regex a)]
+keyValuesToKeyRegex = map (\(k, vs) -> (k, (Alt . map (Concat . map Lit)) vs))
+
+labelKeyValues :: (Ord a, Functor f) => [(a, f a)] -> SymbolToLabelDict a -> [(Label, f Label)]
 labelKeyValues kvs dict =
     let translate s = fromJust $ M.lookup s dict
-     in map (\(k, vs) -> (translate k, Alt (map (Concat . map (Lit . translate)) vs))) kvs
+     in map (\(k, vs) -> (translate k, translate <$> vs)) kvs
 
 -- | Invert an 'Int'-to-@a@ labelling.
 invertSymbolToLabelDict :: Ord a => LabelToSymbolDict a -> SymbolToLabelDict a
@@ -424,6 +452,18 @@ relabel labelsToSymbolsDict inverseRelabelling =
 productionsToCFG :: (Ord a, Show a) => a -> [(a, [[a]])] -> CFG a
 productionsToCFG start kvs =
     let (ikvs, labelsToSymbolsDict, symbolsToLabelsDict) = labelAllSymbols kvs
+        startLabel = fromJust $ M.lookup start symbolsToLabelsDict
+        (intCFG, inverseRelabelling, _) = productionsToIntCFG startLabel ikvs
+        labelsToSymbolsDict' = relabel labelsToSymbolsDict inverseRelabelling
+        symbolsToLabelsDict' = invertSymbolToLabelDict labelsToSymbolsDict'
+     in CFG start intCFG symbolsToLabelsDict' labelsToSymbolsDict'
+
+{- | Build a 'CFG' from an association list of @(symbol, symbol regex)@
+     pairs. Both the symbol and the regex are represented as Strings.
+-}
+regexesToCFG :: (Ord a, Show a) => a -> [(a, Regex a)] -> CFG a
+regexesToCFG start kvs =
+    let (ikvs, labelsToSymbolsDict, symbolsToLabelsDict) = labelAllRegexes kvs
         startLabel = fromJust $ M.lookup start symbolsToLabelsDict
         (intCFG, inverseRelabelling, _) = productionsToIntCFG startLabel ikvs
         labelsToSymbolsDict' = relabel labelsToSymbolsDict inverseRelabelling

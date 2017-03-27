@@ -21,6 +21,7 @@ module Grammar.Regex
 , needsBracketsWithin
 , bracketed
 , simplify
+, harvest
 ) where
 
 
@@ -28,7 +29,8 @@ module Grammar.Regex
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Data.List (intercalate)
-import Data.Foldable (Foldable)
+import Data.Foldable (Foldable, foldr)
+import qualified Data.Set as S
 
 {- | The Regex datatype.
 -}
@@ -138,3 +140,12 @@ simplify' (Plus (QuestionMark r)) = Star $ simplify' r
 simplify' (Star r) = Star $ simplify' r
 simplify' (Plus r) = Plus $ simplify' r
 simplify' (QuestionMark r) = QuestionMark $ simplify' r
+
+harvest :: Ord a => Regex a -> S.Set a
+harvest Empty = S.empty
+harvest (Lit a) = S.singleton a
+harvest (Concat rs) = foldr (\r set -> harvest r `S.union` set) S.empty rs
+harvest (Alt rs) = foldr (\r set -> harvest r `S.union` set) S.empty rs
+harvest (Star r) = harvest r
+harvest (Plus r) = harvest r
+harvest (QuestionMark r) = harvest r
