@@ -29,7 +29,7 @@ concatenation = do r <- many1 multiplication
 
 multiplication :: Stream s m Char => ParsecT s u m (Regex Char)
 multiplication = do r <- unit
-                    option r ((choice [star, plus, questionMark]) <*> return r)
+                    option r (choice [star, plus, questionMark] <*> return r)
 
 star :: Stream s m Char => ParsecT s u m (Regex Char -> Regex Char)
 star = char '*' *> return Star
