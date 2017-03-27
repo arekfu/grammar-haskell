@@ -54,6 +54,7 @@ test-suite grammar-test
   other-modules:       CFGTest
                      , CFGRandomTest
                      , RegexTest
+                     , RegexParseTest
                      , RegexRandomTest
                      , SymbolsTest
                      , MCTest

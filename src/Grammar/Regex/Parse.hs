@@ -9,46 +9,56 @@ import Control.Monad (void)
 -- local imports
 import Grammar.Regex
 
+whitespace :: Stream s m Char => ParsecT s u m ()
+whitespace = spaces
+
+-- | Modify a parser to skip any following whitespace
+lexeme :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
+lexeme p = do whitespace
+              x <- p
+              whitespace
+              return x
+
 parens :: Stream s m Char => ParsecT s u m a -> ParsecT s u m a
-parens = between (char '(')  (char ')')
+parens = lexeme . between (char '(')  (char ')')
 
 regexParser :: Stream s m Char => ParsecT s u m (Regex Char)
 regexParser = alt <* (choice [void newline, eof] <?> "end of input")
 
 alt :: Stream s m Char => ParsecT s u m (Regex Char)
-alt = do r <- sepBy1 concatenation (char '|')
+alt = do r <- lexeme $ sepBy1 (lexeme concatenation) (char '|')
          case r of
              [x] -> return x
              xs -> return $ Alt xs
 
 concatenation :: Stream s m Char => ParsecT s u m (Regex Char)
-concatenation = do r <- many1 multiplication
+concatenation = do r <- lexeme $ many1 (lexeme multiplication)
                    case r of
                        [x] -> return x
                        xs -> return $ Concat xs
 
 multiplication :: Stream s m Char => ParsecT s u m (Regex Char)
-multiplication = do r <- unit
+multiplication = do r <- lexeme unit
                     option r (choice [star, plus, questionMark] <*> return r)
 
 star :: Stream s m Char => ParsecT s u m (Regex Char -> Regex Char)
-star = char '*' *> return Star
+star = lexeme (char '*') *> return Star
 
 plus :: Stream s m Char => ParsecT s u m (Regex Char -> Regex Char)
-plus = char '+' *> return Plus
+plus = lexeme (char '+') *> return Plus
 
 questionMark :: Stream s m Char => ParsecT s u m (Regex Char -> Regex Char)
-questionMark = char '?' *> return QuestionMark
+questionMark = lexeme(char '?') *> return QuestionMark
 
 unit :: Stream s m Char => ParsecT s u m (Regex Char)
-unit = parens alt <|> symbol
+unit = parens alt <|> lexeme symbol
 
 symbol :: Stream s m Char => ParsecT s u m (Regex Char)
 symbol = char '<' *> choice [empty, lit] <?> "identifier"
 
 empty :: Stream s m Char => ParsecT s u m (Regex Char)
-empty = char '>' *> pure Empty <* spaces
+empty = char '>' *> pure Empty
 
 lit :: Stream s m Char => ParsecT s u m (Regex Char)
 lit = Lit <$> noneOf ['\"', '<', '>', '(', ')', '*', '+', '?', '|']
-                <* char '>' <* spaces <?> "quote at the end of symbol"
+                <* char '>' <?> "quote at the end of symbol"

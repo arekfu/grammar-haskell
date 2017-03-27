@@ -12,12 +12,10 @@ import Test.QuickCheck.Function
 import Data.Foldable
 import Data.Coerce
 import Data.Monoid (Sum, Endo(..), Dual(..), appEndo, getDual)
-import Text.Parsec hiding (Empty)
 
 -- local imports
 import SymbolsTest (NonTerminal(..))
 import Grammar.Regex
-import Grammar.Regex.Parse
 
 
 newtype ARegex a = ARegex { unARegex :: Regex a } deriving (Eq, Ord, Show)
@@ -42,14 +40,6 @@ instance Arbitrary a => Arbitrary (ARegex a) where
     shrink (ARegex (Plus r))         = [ARegex Empty, ARegex r]
     shrink (ARegex (QuestionMark r)) = [ARegex Empty, ARegex r]
 
-
-prop_parseShowIdempotence :: ARegex NonTerminal -> Property
-prop_parseShowIdempotence (ARegex r) =
-    let r' = coerce r
-        rstr = showRegexQuoted r'
-     in case parse regexParser "parseShowIdempotence" rstr of
-            Left parseError -> counterexample ("Parsing failed\n  regex: " ++ rstr ++ "\n  error: " ++ show parseError) False
-            Right r'' -> simplify r' === simplify r''
 
 
 prop_simplifyIdempotence :: ARegex NonTerminal -> Property
