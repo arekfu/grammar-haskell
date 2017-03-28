@@ -16,7 +16,6 @@ module Grammar
   Grammar(..)
 -- ** Pretty-printing parts of a grammar
 -- $examplegrammar
-, showWord
 , showProductions
 , showGrammar
 -- * Context-free grammars over alphabets of integers

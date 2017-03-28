@@ -12,14 +12,14 @@ context-free grammars.
 -}
 
 module Grammar.Regex
-( Regex(..)
-, Quoting(..)
+( Quoting(..)
+, quote
+, ShowSymbol(..)
+, Regex(..)
 , showRegex
 , showRegexWith
 , showRegexQuoted
 , showRegexBracketed
-, showRegexChar
-, showRegexString
 , needsBracketsWithin
 , bracketed
 , simplify
@@ -34,6 +34,22 @@ import Data.List (intercalate)
 import Data.Foldable (Foldable, foldr)
 import qualified Data.Set as S
 
+
+
+data Quoting = Quoting Char Char
+             | NoQuoting
+
+quote :: Quoting -> String -> String
+quote (Quoting left right) s = left : s ++ [right]
+quote NoQuoting s = s
+
+class ShowSymbol a where
+    -- | Convert a symbol to a 'String'.
+    showSymbol :: Quoting -> a -> String
+
+instance ShowSymbol Char where
+    showSymbol q c = quote q [c]
+
 {- | The Regex datatype.
 -}
 data Regex a = Empty                    -- ^ The empty regex, matches anything
@@ -44,6 +60,7 @@ data Regex a = Empty                    -- ^ The empty regex, matches anything
              | Concat [Regex a]         -- ^ Concatenation of regexes
              | Alt [Regex a]            -- ^ Disjunction of regexes
              deriving (Eq, Ord, Generic, NFData, Show)
+
 
 needsBracketsWithin :: Regex a -> Regex a -> Bool
 (Alt _) `needsBracketsWithin` _ = True
@@ -62,41 +79,28 @@ needsBracketsWithin :: Regex a -> Regex a -> Bool
 (QuestionMark _) `needsBracketsWithin` (QuestionMark _) = True
 _ `needsBracketsWithin` _ = False
 
-data Quoting = Quoting Char Char
-             | NoQuoting
-
-quote :: Quoting -> String -> String
-quote (Quoting left right) s = left : s ++ [right]
-quote NoQuoting s = s
-
 bracketed :: Regex a -> Regex a -> String -> String
 bracketed r0 r1 s = if r0 `needsBracketsWithin` r1
                     then "(" ++ s ++ ")"
                     else s
 
-showRegexWith :: Quoting -> (a -> String) -> Regex a -> String
-showRegexWith q _ Empty = quote q ""
-showRegexWith q s (Lit a) = quote q $ s a
-showRegexWith q s r0@(Star r) = bracketed r r0 (showRegexWith q s r) ++ "*"
-showRegexWith q s r0@(Plus r) = bracketed r  r0 (showRegexWith q s r) ++ "+"
-showRegexWith q s r0@(QuestionMark r) = bracketed r r0 (showRegexWith q s r) ++ "?"
-showRegexWith q s r0@(Concat rs) = concatMap (\r -> bracketed r r0 $ showRegexWith q s r) rs
-showRegexWith q s r0@(Alt rs) = intercalate "|" $ map (\r -> bracketed r r0 $ showRegexWith q s r) rs
+showRegexWith :: ShowSymbol a => Quoting -> Regex a -> String
+showRegexWith q Empty = quote q ""
+showRegexWith q (Lit a) = showSymbol q a
+showRegexWith q r0@(Star r) = bracketed r r0 (showRegexWith q r) ++ "*"
+showRegexWith q r0@(Plus r) = bracketed r  r0 (showRegexWith q r) ++ "+"
+showRegexWith q r0@(QuestionMark r) = bracketed r r0 (showRegexWith q r) ++ "?"
+showRegexWith q r0@(Concat rs) = concatMap (\r -> bracketed r r0 $ showRegexWith q r) rs
+showRegexWith q r0@(Alt rs) = intercalate "|" $ map (\r -> bracketed r r0 $ showRegexWith q r) rs
 
-showRegex :: Show a => Regex a -> String
-showRegex = showRegexWith NoQuoting show
+showRegex :: ShowSymbol a => Regex a -> String
+showRegex = showRegexWith NoQuoting
 
-showRegexQuoted :: Regex Char -> String
-showRegexQuoted = showRegexWith (Quoting '"' '"') (:[])
+showRegexQuoted :: ShowSymbol a => Regex a -> String
+showRegexQuoted = showRegexWith (Quoting '"' '"')
 
-showRegexBracketed :: Regex Char -> String
-showRegexBracketed = showRegexWith (Quoting '<' '>') (:[])
-
-showRegexChar :: Regex Char -> String
-showRegexChar = showRegexWith NoQuoting (:[])
-
-showRegexString :: Regex String -> String
-showRegexString = showRegexWith NoQuoting id
+showRegexBracketed :: ShowSymbol a => Regex a -> String
+showRegexBracketed = showRegexWith (Quoting '<' '>')
 
 instance Functor Regex where
     fmap _ Empty = Empty

@@ -34,12 +34,12 @@ main = do
           let expansion = randomGrammarDeriveScan exampleGrammar
           TimeSpec _ seed <- getTime Realtime
           let strings = take 20 $ evalMC expansion $ fromIntegral seed
-          mapM_ (putStrLn . showWord) strings
+          mapM_ (putStrLn . concatMap (showSymbol NoQuoting)) strings
           putStrLn ""
           -- digits grammar
           putStrLn $ showGrammar digitsGrammar
           let digitExpansion = randomGrammarDerive digitsGrammar
-          putStrLn $ showWord $ evalMC digitExpansion $ fromIntegral seed
+          putStrLn $ concatMap (showSymbol NoQuoting) $ evalMC digitExpansion $ fromIntegral seed
           putStrLn ""
           -- examine the structureof the regexes
           print $ productions digitsGrammar (ReprString "<D>")

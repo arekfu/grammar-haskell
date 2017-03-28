@@ -20,7 +20,6 @@ module Grammar.CFG
 , allProductions
 -- ** Pretty-printing parts of a grammar
 -- $examplegrammar
-, showWord
 , showProductions
 , showGrammarWith
 , showGrammar
@@ -56,8 +55,10 @@ module Grammar.CFG
 -- * Context-free grammars over alphabets of specific types
 , CharCFG(..)
 , productionsToCharCFG
+, regexesToCharCFG
 , StringCFG(..)
 , productionsToStringCFG
+, regexesToStringCFG
 ) where
 
 -- system imports
@@ -88,9 +89,6 @@ class Grammar g where
     -- | @productions gr sym@ returns the productions associated with label @sym@ in grammar @gr@.
     productions :: g -> Repr g -> Maybe (Regex (Repr g))
 
-    -- | Convert a symbol to a 'String'.
-    showSymbol :: Repr g -> String
-
     -- | Is this symbol part of the grammar?
     isInGrammar :: Repr g -> g -> Bool
     isInGrammar x gr = not $ isNotInGrammar x gr
@@ -120,45 +118,38 @@ class Grammar g where
     startSymbol :: g -> Repr g
 
 
--- | Pretty-print a word (a sequence of symbols).
-showWord :: Grammar g
-         => [Repr g]    -- ^ the word
-         -> String      -- ^ the word, pretty-printed as a String
-showWord = concatMap showSymbol
-
 {- | Pretty-print all the production rules associated with a symbol, in
      Backus-Naur form.
 
    >>> putStrLn $ showProductions exampleGrammar 'E'
    E := E+E | E*E | (E) | I
 -}
-showProductions :: (Grammar g, Show (Repr g))
+showProductions :: (Grammar g, ShowSymbol (Repr g))
                 => g            -- ^ the grammar
-                -> (Regex (Repr g) -> String)  -- ^ a function that knows how to
-                                               --   display 'Regex'es
+                -> Quoting      -- ^ the quoting policy
                 -> Repr g       -- ^ the symbol on the left-hand side of the rule
                 -> String       -- ^ the pretty-printed production rule
-showProductions grammar showR sym = let header = showSymbol sym
-                                        prod = productions grammar sym
-                                     in case prod of
-                                            Nothing   -> ""
-                                            Just rule -> header ++ " := " ++ showR rule ++ "\n"
+showProductions grammar quoting sym =
+    let header = showSymbol quoting sym
+        prod = productions grammar sym
+     in case prod of
+            Nothing   -> ""
+            Just rule -> header ++ " := " ++ showRegexWith quoting rule ++ "\n"
 
 
 {- | Pretty-print all the production rules in a grammar using an external
      function to display lists of production rules.
 -}
-showGrammarWith :: (Grammar g, Show (Repr g))
-                => (Regex (Repr g) -> String)  -- ^ a function that knows how to
-                                               --   display 'Regex'es
+showGrammarWith :: (Grammar g, ShowSymbol (Repr g))
+                => Quoting                  -- ^ the quoting policy
                 -> g                        -- ^ the grammar
                 -> String                   -- ^ its pretty-printed representation as a String
-showGrammarWith showR grammar = let syms = S.toList $ getNonTerminals grammar
-                                    prods = concatMap (showProductions grammar showR) syms
-                                    start = "\nStart: " ++ showSymbol (startSymbol grammar)
-                                    terms = "\nTerminals: " ++ show (getTerminals grammar)
-                                    nonterms = "\nNonterminals: " ++ show (getNonTerminals grammar)
-                                 in prods ++ start ++ terms ++ nonterms
+showGrammarWith quoting grammar = let syms = S.toList $ getNonTerminals grammar
+                                      prods = concatMap (showProductions grammar quoting) syms
+                                      start = "\nStart: " ++ showSymbol quoting (startSymbol grammar)
+                                      terms = "\nTerminals: " ++ show (S.map (showSymbol quoting) $ getTerminals grammar)
+                                      nonterms = "\nNonterminals: " ++ show (S.map (showSymbol quoting) $ getNonTerminals grammar)
+                                   in prods ++ start ++ terms ++ nonterms
 
 
 {- | Pretty-print all the production rules in a grammar, in Backus-Naur form.
@@ -167,10 +158,10 @@ showGrammarWith showR grammar = let syms = S.toList $ getNonTerminals grammar
    E := E+E | E*E | (E) | I
    I := a | b | c | Ia | Ib | Ic | I0 | I1 | I2 | I3
 -}
-showGrammar :: (Grammar g, Show (Repr g))
+showGrammar :: (Grammar g, ShowSymbol (Repr g))
             => g                        -- ^ the grammar
             -> String                   -- ^ its pretty-printed representation as a String
-showGrammar = showGrammarWith showRegex
+showGrammar = showGrammarWith NoQuoting
 
 
 
@@ -318,7 +309,6 @@ instance Grammar IntCFG where
     -- all the instance declarations do is actually wrap and unwrap the Repr
     -- datatype
     productions g (ReprInt sym) = fmap ReprInt <$> productionsInt g sym
-    showSymbol (ReprInt sym) = show sym
     isInGrammar (ReprInt sym) = isInIntCFG sym
     isNotInGrammar (ReprInt sym) = isNotInIntCFG sym
     isTerminal (ReprInt sym) = isTerminalInt sym
@@ -328,6 +318,7 @@ instance Grammar IntCFG where
     getNonTerminals = S.map ReprInt . getNonTerminalsInt
     startSymbol _ = ReprInt 0
 
+instance ShowSymbol (Repr IntCFG) where showSymbol q (ReprInt i) = quote q $ show i
 
 
 {- | A datatype representing context-free grammars over alphabets of arbitrary
@@ -517,7 +508,6 @@ startSymbolCFG (CFG start _ _ _) = start
 instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     data Repr (CFG a) = ReprCFG { unReprCFG :: a } deriving (Eq, Ord, Show)
     productions grammar (ReprCFG s) = fmap ReprCFG <$> productionsCFG grammar s
-    showSymbol = show
     isInGrammar (ReprCFG s) = isInCFG s
     isNotInGrammar (ReprCFG s) = isNotInCFG s
     isTerminal (ReprCFG s) = isTerminalCFG s
@@ -527,6 +517,7 @@ instance (Eq a, Ord a, Show a) => Grammar (CFG a) where
     getNonTerminals = S.map ReprCFG . getNonTerminalsCFG
     startSymbol = ReprCFG . startSymbolCFG
 
+instance Show a => ShowSymbol (Repr (CFG a)) where showSymbol q (ReprCFG s) = quote q $ show s
 
 
 {- | A newtype for 'Char'-based context-free grammars. This is solely done to
@@ -543,7 +534,6 @@ newtype CharCFG = CharCFG (CFG Char) deriving (Eq, Ord, Generic, NFData, Show)
 instance Grammar CharCFG where
     data Repr CharCFG = ReprChar { unReprChar :: Char } deriving (Eq, Ord)
     productions (CharCFG g) (ReprChar c) = fmap ReprChar <$> productionsCFG g c
-    showSymbol (ReprChar s) = [s]
     isInGrammar (ReprChar s) (CharCFG g) = isInCFG s g
     isNotInGrammar (ReprChar s) (CharCFG g) = isNotInCFG s g
     isTerminal (ReprChar s) (CharCFG g) = isTerminalCFG s g
@@ -555,9 +545,17 @@ instance Grammar CharCFG where
 
 instance Show (Repr CharCFG) where show (ReprChar c) = [c]
 
+instance ShowSymbol (Repr CharCFG) where showSymbol q (ReprChar c) = quote q [c]
+
 -- | Build a 'CharCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
 productionsToCharCFG start = CharCFG . productionsToCFG start
+
+{- | Build a 'CharCFG' from an association list of @(symbol, symbol regex)@
+     pairs -- see @regexesToCFG@.
+-}
+regexesToCharCFG :: Char -> [(Char, Regex Char)] -> CharCFG
+regexesToCharCFG start = CharCFG . regexesToCFG start
 
 
 {- | A newtype for 'String'-based context-free grammars. This is solely done to
@@ -574,7 +572,6 @@ newtype StringCFG = StringCFG (CFG String) deriving (Eq, Ord, Generic, NFData, S
 instance Grammar StringCFG where
     data Repr StringCFG = ReprString { unReprString :: String } deriving (Eq, Ord)
     productions (StringCFG g) (ReprString s) = fmap ReprString <$> productionsCFG g s
-    showSymbol (ReprString s) = s
     isInGrammar (ReprString s) (StringCFG g)= isInCFG s g
     isNotInGrammar (ReprString s) (StringCFG g) = isNotInCFG s g
     isTerminal (ReprString s) (StringCFG g) = isTerminalCFG s g
@@ -586,6 +583,14 @@ instance Grammar StringCFG where
 
 instance Show (Repr StringCFG) where show = unReprString
 
+instance ShowSymbol (Repr StringCFG) where showSymbol q = quote q . unReprString
+
 -- | Build a 'StringCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG
 productionsToStringCFG start = StringCFG . productionsToCFG start
+
+{- | Build a 'StringCFG' from an association list of @(symbol, symbol regex)@
+     pairs -- see @regexesToCFG@.
+-}
+regexesToStringCFG :: String -> [(String, Regex String)] -> StringCFG
+regexesToStringCFG start = StringCFG . regexesToCFG start
