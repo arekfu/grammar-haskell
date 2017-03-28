@@ -10,11 +10,11 @@ import Control.Monad (void)
 import Grammar.Regex
 import Grammar.Regex.Parse
 
-ruleParser :: Stream s m Char => ParsecT s u m (Char, Regex Char)
+ruleParser :: Stream s m Char => ParsecT s Quoting m (Char, Regex Char)
 ruleParser = do sym <- lexeme symbol
                 void $ lexeme $ string ":="
                 regex <- lexeme $ regexParser
                 return (sym, regex)
 
-cfgParser :: Stream s m Char => ParsecT s u m [(Char, Regex Char)]
+cfgParser :: Stream s m Char => ParsecT s Quoting m [(Char, Regex Char)]
 cfgParser = many ruleParser

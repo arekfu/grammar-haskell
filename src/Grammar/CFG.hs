@@ -134,30 +134,31 @@ showWord = concatMap showSymbol
 -}
 showProductions :: (Grammar g, Show (Repr g))
                 => g            -- ^ the grammar
+                -> (Regex (Repr g) -> String)  -- ^ a function that knows how to
+                                               --   display 'Regex'es
                 -> Repr g       -- ^ the symbol on the left-hand side of the rule
                 -> String       -- ^ the pretty-printed production rule
-showProductions grammar sym = let header = showSymbol sym
-                                  prod = productions grammar sym
-                               in case prod of
-                                      Nothing   -> ""
-                                      Just rule -> header ++ " := " ++ showRegex rule ++ "\n"
+showProductions grammar showR sym = let header = showSymbol sym
+                                        prod = productions grammar sym
+                                     in case prod of
+                                            Nothing   -> ""
+                                            Just rule -> header ++ " := " ++ showR rule ++ "\n"
 
 
 {- | Pretty-print all the production rules in a grammar using an external
      function to display lists of production rules.
 -}
 showGrammarWith :: (Grammar g, Show (Repr g))
-                => (g -> Repr g -> String)  -- ^ a function that knows how to
-                                            --   display production rules
-                                            --   associated with a given symbol
+                => (Regex (Repr g) -> String)  -- ^ a function that knows how to
+                                               --   display 'Regex'es
                 -> g                        -- ^ the grammar
                 -> String                   -- ^ its pretty-printed representation as a String
-showGrammarWith showProds grammar = let syms = S.toList $ getNonTerminals grammar
-                                        prods = concatMap (showProds grammar) syms
-                                        start = "\nStart: " ++ showSymbol (startSymbol grammar)
-                                        terms = "\nTerminals: " ++ show (getTerminals grammar)
-                                        nonterms = "\nNonterminals: " ++ show (getNonTerminals grammar)
-                                     in prods ++ start ++ terms ++ nonterms
+showGrammarWith showR grammar = let syms = S.toList $ getNonTerminals grammar
+                                    prods = concatMap (showProductions grammar showR) syms
+                                    start = "\nStart: " ++ showSymbol (startSymbol grammar)
+                                    terms = "\nTerminals: " ++ show (getTerminals grammar)
+                                    nonterms = "\nNonterminals: " ++ show (getNonTerminals grammar)
+                                 in prods ++ start ++ terms ++ nonterms
 
 
 {- | Pretty-print all the production rules in a grammar, in Backus-Naur form.
@@ -169,7 +170,7 @@ showGrammarWith showProds grammar = let syms = S.toList $ getNonTerminals gramma
 showGrammar :: (Grammar g, Show (Repr g))
             => g                        -- ^ the grammar
             -> String                   -- ^ its pretty-printed representation as a String
-showGrammar = showGrammarWith showProductions
+showGrammar = showGrammarWith showRegex
 
 
 

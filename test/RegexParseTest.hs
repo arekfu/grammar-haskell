@@ -17,7 +17,7 @@ prop_parseShowIdempotence :: ARegex NonTerminal -> Property
 prop_parseShowIdempotence (ARegex r) =
     let r' = coerce r
         rstr = showRegexQuoted r'
-     in case parse regexParser "parseShowIdempotence" rstr of
+     in case runParser regexParser (Quoting '"' '"') "parseShowIdempotence" rstr of
             Left parseError -> counterexample ("Parsing failed\n  regex: " ++ rstr ++ "\n  error: " ++ show parseError) False
             Right r'' -> simplify r' === simplify r''
 
