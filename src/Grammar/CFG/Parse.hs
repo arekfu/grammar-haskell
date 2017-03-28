@@ -13,7 +13,7 @@ import Grammar.Regex.Parse
 ruleParser :: Stream s m Char => ParsecT s Quoting m (Char, Regex Char)
 ruleParser = do sym <- lexeme symbol
                 void $ lexeme $ string ":="
-                regex <- lexeme $ regexParser
+                regex <- lexeme regexParser
                 return (sym, regex)
 
 cfgParser :: Stream s m Char => ParsecT s Quoting m [(Char, Regex Char)]
