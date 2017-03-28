@@ -2,6 +2,7 @@
 
 module RegexTest
 ( ARegex(..)
+, AQuoting(..)
 , runTests
 , printExamples
 ) where
@@ -12,11 +13,19 @@ import Test.QuickCheck.Function
 import Data.Foldable
 import Data.Coerce
 import Data.Monoid (Sum, Endo(..), Dual(..), appEndo, getDual)
+import Data.Char (isPunctuation, isSymbol)
+import Data.List (notElem)
 
 -- local imports
 import SymbolsTest (NonTerminal(..))
 import Grammar.Regex
 
+newtype AQuoting = AQuoting { unAQuoting :: Quoting } deriving (Eq, Ord, Show)
+
+instance Arbitrary AQuoting where
+    arbitrary = do leftQuote <- arbitrary `suchThat` (\c -> (isPunctuation c || isSymbol c) && c `notElem` reservedChars)
+                   rightQuote <- arbitrary `suchThat` (\c -> (isPunctuation c || isSymbol c) && c `notElem` reservedChars)
+                   elements $ coerce [NoQuoting, Quoting leftQuote rightQuote]
 
 newtype ARegex a = ARegex { unARegex :: Regex a } deriving (Eq, Ord, Show)
 

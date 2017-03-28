@@ -52,7 +52,7 @@ instance Arbitrary ACharCFG where
                    let nonTerminals = S.toList $ S.fromList $ coerce wNonTerminals
                    let start = head nonTerminals
                    let allLabels = terminals ++ nonTerminals
-                   values <- vectorOf (length nonTerminals) $ listOf1 $ listOf (elements allLabels)
+                   values <- vectorOf (length nonTerminals) $ listOf1 $ listOf1 (elements allLabels)
                    return $ ACharCFG $ productionsToCharCFG start $ zip nonTerminals values
 
 ------------------------------------------------------------------------------------
@@ -108,6 +108,9 @@ prop_terminalsHaveNoProductionsInt (AIntCFG g) = all (null . productions g) $ ge
 prop_nonTerminalsHaveProductionsInt :: AIntCFG -> Bool
 prop_nonTerminalsHaveProductionsInt (AIntCFG g) = all (not . null . productions g) $ getNonTerminals g
 
+prop_simplifyIdempotenceIntCFG :: AIntCFG -> Property
+prop_simplifyIdempotenceIntCFG (AIntCFG g) = let g' = simplifyIntCFG g in g' === simplifyIntCFG g'
+
 
 ---------------------------------
 --  properties about real CFG  --
@@ -134,6 +137,9 @@ prop_nonTerminalsHaveProductions (ACharCFG g) =
         map (\s -> counterexample ("failing symbol: " ++ show s) $ not $ null $ productions g s)
             $ S.toList $ getNonTerminals g
 
+prop_simplifyIdempotenceCharCFG :: ACharCFG -> Property
+prop_simplifyIdempotenceCharCFG (ACharCFG (CharCFG g)) =
+    let g' = simplifyCFG g in g' === simplifyCFG g'
 
 return []
 runTests :: IO Bool

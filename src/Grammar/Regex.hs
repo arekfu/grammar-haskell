@@ -14,8 +14,12 @@ context-free grammars.
 module Grammar.Regex
 ( Quoting(..)
 , quote
-, ShowSymbol(..)
+, hasQuoting
+, Escape(..)
+, escapeChar
+, showSymbol
 , Regex(..)
+, isRegexEmpty
 , showRegex
 , showRegexWith
 , showRegexQuoted
@@ -24,6 +28,7 @@ module Grammar.Regex
 , bracketed
 , simplify
 , harvest
+, reservedChars
 ) where
 
 
@@ -38,17 +43,30 @@ import qualified Data.Set as S
 
 data Quoting = Quoting Char Char
              | NoQuoting
+             deriving (Eq, Ord, Show, Generic, NFData)
 
 quote :: Quoting -> String -> String
 quote (Quoting left right) s = left : s ++ [right]
 quote NoQuoting s = s
 
-class ShowSymbol a where
-    -- | Convert a symbol to a 'String'.
-    showSymbol :: Quoting -> a -> String
+hasQuoting :: Quoting -> Bool
+hasQuoting NoQuoting = False
+hasQuoting _ = True
 
-instance ShowSymbol Char where
-    showSymbol q c = quote q [c]
+escapeChar :: Char -> String
+escapeChar c | c `elem` reservedChars = '\\' : c : []
+             | otherwise = [c]
+
+class Escape a where
+    -- | Escape special characters when representing a symbol as a String
+    escape :: a -> String
+
+instance Escape Char where
+    escape = escapeChar
+
+-- | Convert a symbol to a 'String'.
+showSymbol :: Escape a => Quoting -> a -> String
+showSymbol q s = quote q $ escape s
 
 {- | The Regex datatype.
 -}
@@ -60,6 +78,10 @@ data Regex a = Empty                    -- ^ The empty regex, matches anything
              | Concat [Regex a]         -- ^ Concatenation of regexes
              | Alt [Regex a]            -- ^ Disjunction of regexes
              deriving (Eq, Ord, Generic, NFData, Show)
+
+isRegexEmpty :: Regex a -> Bool
+isRegexEmpty Empty = True
+isRegexEmpty _ = False
 
 
 needsBracketsWithin :: Regex a -> Regex a -> Bool
@@ -84,7 +106,7 @@ bracketed r0 r1 s = if r0 `needsBracketsWithin` r1
                     then "(" ++ s ++ ")"
                     else s
 
-showRegexWith :: ShowSymbol a => Quoting -> Regex a -> String
+showRegexWith :: Escape a => Quoting -> Regex a -> String
 showRegexWith q Empty = quote q ""
 showRegexWith q (Lit a) = showSymbol q a
 showRegexWith q r0@(Star r) = bracketed r r0 (showRegexWith q r) ++ "*"
@@ -93,13 +115,13 @@ showRegexWith q r0@(QuestionMark r) = bracketed r r0 (showRegexWith q r) ++ "?"
 showRegexWith q r0@(Concat rs) = concatMap (\r -> bracketed r r0 $ showRegexWith q r) rs
 showRegexWith q r0@(Alt rs) = intercalate "|" $ map (\r -> bracketed r r0 $ showRegexWith q r) rs
 
-showRegex :: ShowSymbol a => Regex a -> String
+showRegex :: Escape a => Regex a -> String
 showRegex = showRegexWith NoQuoting
 
-showRegexQuoted :: ShowSymbol a => Regex a -> String
+showRegexQuoted :: Escape a => Regex a -> String
 showRegexQuoted = showRegexWith (Quoting '"' '"')
 
-showRegexBracketed :: ShowSymbol a => Regex a -> String
+showRegexBracketed :: Escape a => Regex a -> String
 showRegexBracketed = showRegexWith (Quoting '<' '>')
 
 instance Functor Regex where
@@ -165,3 +187,6 @@ harvest (Alt rs) = foldr (\r set -> harvest r `S.union` set) S.empty rs
 harvest (Star r) = harvest r
 harvest (Plus r) = harvest r
 harvest (QuestionMark r) = harvest r
+
+reservedChars :: [Char]
+reservedChars = ['(', ')', '*', '+', '?', '|', '\n', '\r', '\\']

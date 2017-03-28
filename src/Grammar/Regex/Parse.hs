@@ -75,13 +75,12 @@ empty :: Stream s m Char => ParsecT s Quoting m (Regex Char)
 empty = do quoting <- getState
            case quoting of
                Quoting _ right -> void $ char right
-               NoQuoting       -> return ()
+               NoQuoting       -> parserZero
            return Empty
 
 lit :: Stream s m Char => ParsecT s Quoting m Char
 lit = do quoting <- getState
          case quoting of
-             Quoting left right -> parser (left : right : specialChars) <* void (char right) <?> "quote at the end of symbol"
-             NoQuoting          -> parser specialChars
+             Quoting left right -> parser (left : right : reservedChars) <* void (char right) <?> "quote at the end of symbol"
+             NoQuoting          -> parser reservedChars
     where parser sc = noneOf sc <|> (char '\\' *> oneOf sc)
-          specialChars = ['(', ')', '*', '+', '?', '|']

@@ -23,6 +23,7 @@ module Grammar.CFG
 , showProductions
 , showGrammarWith
 , showGrammar
+, pPrintGrammarWith
 -- * Context-free grammars over alphabets of integers
 , IntCFG(..)
 -- ** Type synonims
@@ -38,6 +39,7 @@ module Grammar.CFG
 , inverseRenumberLabels
 , collectLabels
 , renumberMap
+, simplifyIntCFG
 -- * Context free grammars over alphabets of arbitrary types
 , CFG(..)
 , Repr(..)
@@ -46,19 +48,23 @@ module Grammar.CFG
 , gatherAllSymbols
 , harvestAllSymbols
 , labelAllSymbols
+, labelAllRegexes
 , toSymbol
 , toLabel
 , unsafeToSymbol
 , unsafeToLabel
 , symbolsToLabels
 , labelsToSymbols
+, simplifyCFG
 -- * Context-free grammars over alphabets of specific types
 , CharCFG(..)
 , productionsToCharCFG
 , regexesToCharCFG
+, simplifyCharCFG
 , StringCFG(..)
 , productionsToStringCFG
 , regexesToStringCFG
+, simplifyStringCFG
 ) where
 
 -- system imports
@@ -125,7 +131,7 @@ class Grammar g where
    >>> putStrLn $ showProductions exampleGrammar 'E'
    E := E+E | E*E | (E) | I
 -}
-showProductions :: (Grammar g, ShowSymbol (Repr g))
+showProductions :: (Grammar g, Escape (Repr g))
                 => g            -- ^ the grammar
                 -> Quoting      -- ^ the quoting policy
                 -> Repr g       -- ^ the symbol on the left-hand side of the rule
@@ -134,36 +140,47 @@ showProductions grammar quoting sym =
     let header = showSymbol quoting sym
         prod = productions grammar sym
      in case prod of
-            Nothing   -> ""
+            Nothing   -> header ++ " := " ++ quote quoting "" ++ "\n"
             Just rule -> header ++ " := " ++ showRegexWith quoting rule ++ "\n"
 
 
-{- | Pretty-print all the production rules in a grammar using an external
-     function to display lists of production rules.
+{- | Show all the production rules in a grammar, in Backus-Naur form, using a
+     specified quoting policy.
 -}
-showGrammarWith :: (Grammar g, ShowSymbol (Repr g))
+showGrammarWith :: (Grammar g, Escape (Repr g))
                 => Quoting                  -- ^ the quoting policy
                 -> g                        -- ^ the grammar
                 -> String                   -- ^ its pretty-printed representation as a String
 showGrammarWith quoting grammar = let syms = S.toList $ getNonTerminals grammar
-                                      prods = concatMap (showProductions grammar quoting) syms
-                                      start = "\nStart: " ++ showSymbol quoting (startSymbol grammar)
-                                      terms = "\nTerminals: " ++ show (S.map (showSymbol quoting) $ getTerminals grammar)
-                                      nonterms = "\nNonterminals: " ++ show (S.map (showSymbol quoting) $ getNonTerminals grammar)
-                                   in prods ++ start ++ terms ++ nonterms
+                                   in concatMap (showProductions grammar quoting) syms
 
 
-{- | Pretty-print all the production rules in a grammar, in Backus-Naur form.
+{- | Show all the production rules in a grammar, in Backus-Naur form, without quoting.
 
    >>> putStrLn $ showGrammar exampleGrammar
    E := E+E | E*E | (E) | I
    I := a | b | c | Ia | Ib | Ic | I0 | I1 | I2 | I3
 -}
-showGrammar :: (Grammar g, ShowSymbol (Repr g))
+showGrammar :: (Grammar g, Escape (Repr g))
             => g                        -- ^ the grammar
             -> String                   -- ^ its pretty-printed representation as a String
 showGrammar = showGrammarWith NoQuoting
 
+
+
+{- | Pretty-print all the production rules in a grammar using an external
+     function to display lists of production rules.
+-}
+pPrintGrammarWith :: (Grammar g, Escape (Repr g))
+                  => Quoting                  -- ^ the quoting policy
+                  -> g                        -- ^ the grammar
+                  -> String                   -- ^ its pretty-printed representation as a String
+pPrintGrammarWith quoting grammar = let syms = S.toList $ getNonTerminals grammar
+                                        prods = concatMap (showProductions grammar quoting) syms
+                                        start = "\nStart: " ++ showSymbol quoting (startSymbol grammar)
+                                        terms = "\nTerminals: " ++ show (S.map (showSymbol quoting) $ getTerminals grammar)
+                                        nonterms = "\nNonterminals: " ++ show (S.map (showSymbol quoting) $ getNonTerminals grammar)
+                                     in prods ++ start ++ terms ++ nonterms
 
 
 
@@ -319,7 +336,16 @@ instance Grammar IntCFG where
     getNonTerminals = S.map ReprInt . getNonTerminalsInt
     startSymbol _ = ReprInt 0
 
-instance ShowSymbol (Repr IntCFG) where showSymbol q (ReprInt i) = quote q $ show i
+instance Escape (Repr IntCFG) where escape i = show i
+
+{- | Apply 'Grammar.Regex.simplify' to all the 'Regex'es used in the grammar.
+-}
+simplifyIntCFG :: IntCFG    -- ^ the grammar to simplify
+               -> IntCFG    -- ^ the simplified grammar
+simplifyIntCFG (IntCFG n i g) = let g' = simplify <$> g
+                                 in IntCFG n i g'
+
+
 
 
 {- | A datatype representing context-free grammars over alphabets of arbitrary
@@ -379,7 +405,7 @@ gatherAllSymbols = foldr' insertKeyValue S.empty
 
 -- | Extract all the symbols from an association list of regexes.
 harvestAllSymbols :: Ord a => [(a, Regex a)] -> S.Set a
-harvestAllSymbols = foldr' (S.union . harvest . snd) S.empty
+harvestAllSymbols = foldr' (\(c, r) set -> S.insert c $ set `S.union` (harvest r)) S.empty
 
 {- | Given a list of production rules in the form of an association list,
      associate a label to each mentioned symbol and return an association list
@@ -521,7 +547,16 @@ instance (Eq a, Ord a) => Grammar (CFG a) where
     getNonTerminals = S.map ReprCFG . getNonTerminalsCFG
     startSymbol = ReprCFG . startSymbolCFG
 
-instance Show a => ShowSymbol (Repr (CFG a)) where showSymbol q (ReprCFG s) = quote q $ show s
+instance Show a => Escape (Repr (CFG a)) where escape (ReprCFG s) = concatMap escapeChar $ show s
+
+
+{- | Apply 'Grammar.Regex.simplify' to all the 'Regex'es used in the grammar.
+-}
+simplifyCFG :: CFG a    -- ^ the grammar to simplify
+            -> CFG a    -- ^ the simplified grammar
+simplifyCFG (CFG start iGr s2l l2s) = let iGr' = simplifyIntCFG iGr
+                                       in CFG start iGr' s2l l2s
+
 
 
 {- | A newtype for 'Char'-based context-free grammars. This is solely done to
@@ -549,7 +584,7 @@ instance Grammar CharCFG where
 
 instance Show (Repr CharCFG) where show (ReprChar c) = [c]
 
-instance ShowSymbol (Repr CharCFG) where showSymbol q (ReprChar c) = quote q [c]
+instance Escape (Repr CharCFG) where escape (ReprChar c) = escapeChar c
 
 -- | Build a 'CharCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
@@ -560,6 +595,13 @@ productionsToCharCFG start = CharCFG . productionsToCFG start
 -}
 regexesToCharCFG :: Char -> [(Char, Regex Char)] -> CharCFG
 regexesToCharCFG start = CharCFG . regexesToCFG start
+
+{- | Apply 'Grammar.Regex.simplify' to all the 'Regex'es used in the grammar.
+-}
+simplifyCharCFG :: CharCFG    -- ^ the grammar to simplify
+                -> CharCFG    -- ^ the simplified grammar
+simplifyCharCFG (CharCFG g) = CharCFG $ simplifyCFG g
+
 
 
 {- | A newtype for 'String'-based context-free grammars. This is solely done to
@@ -587,7 +629,7 @@ instance Grammar StringCFG where
 
 instance Show (Repr StringCFG) where show = unReprString
 
-instance ShowSymbol (Repr StringCFG) where showSymbol q = quote q . unReprString
+instance Escape (Repr StringCFG) where escape = concatMap escapeChar . unReprString
 
 -- | Build a 'StringCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG
@@ -598,3 +640,9 @@ productionsToStringCFG start = StringCFG . productionsToCFG start
 -}
 regexesToStringCFG :: String -> [(String, Regex String)] -> StringCFG
 regexesToStringCFG start = StringCFG . regexesToCFG start
+
+{- | Apply 'Grammar.Regex.simplify' to all the 'Regex'es used in the grammar.
+-}
+simplifyStringCFG :: StringCFG    -- ^ the grammar to simplify
+                  -> StringCFG    -- ^ the simplified grammar
+simplifyStringCFG (StringCFG g) = StringCFG $ simplifyCFG g
