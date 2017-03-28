@@ -43,8 +43,8 @@ instance Arbitrary a => Arbitrary (ARegex a) where
 
     shrink (ARegex Empty)            = []
     shrink (ARegex (Lit _))          = [ARegex Empty]
-    shrink (ARegex (Concat rs))      = [ARegex Empty] ++ coerce rs
-    shrink (ARegex (Alt rs))         = [ARegex Empty] ++ coerce rs
+    shrink (ARegex (Concat rs))      = ARegex Empty : coerce rs
+    shrink (ARegex (Alt rs))         = ARegex Empty : coerce rs
     shrink (ARegex (Star r))         = [ARegex Empty, ARegex r]
     shrink (ARegex (Plus r))         = [ARegex Empty, ARegex r]
     shrink (ARegex (QuestionMark r)) = [ARegex Empty, ARegex r]

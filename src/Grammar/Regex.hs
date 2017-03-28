@@ -54,7 +54,7 @@ hasQuoting NoQuoting = False
 hasQuoting _ = True
 
 escapeChar :: Char -> String
-escapeChar c | c `elem` reservedChars = '\\' : c : []
+escapeChar c | c `elem` reservedChars = ['\\', c]
              | otherwise = [c]
 
 class Escape a where
@@ -188,5 +188,5 @@ harvest (Star r) = harvest r
 harvest (Plus r) = harvest r
 harvest (QuestionMark r) = harvest r
 
-reservedChars :: [Char]
-reservedChars = ['(', ')', '*', '+', '?', '|', '\n', '\r', '\\']
+reservedChars :: String
+reservedChars = "()*+?|\n\r\\"

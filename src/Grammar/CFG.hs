@@ -336,7 +336,7 @@ instance Grammar IntCFG where
     getNonTerminals = S.map ReprInt . getNonTerminalsInt
     startSymbol _ = ReprInt 0
 
-instance Escape (Repr IntCFG) where escape i = show i
+instance Escape (Repr IntCFG) where escape = show
 
 {- | Apply 'Grammar.Regex.simplify' to all the 'Regex'es used in the grammar.
 -}
@@ -405,7 +405,7 @@ gatherAllSymbols = foldr' insertKeyValue S.empty
 
 -- | Extract all the symbols from an association list of regexes.
 harvestAllSymbols :: Ord a => [(a, Regex a)] -> S.Set a
-harvestAllSymbols = foldr' (\(c, r) set -> S.insert c $ set `S.union` (harvest r)) S.empty
+harvestAllSymbols = foldr' (\(c, r) set -> S.insert c $ set `S.union` harvest r) S.empty
 
 {- | Given a list of production rules in the form of an association list,
      associate a label to each mentioned symbol and return an association list

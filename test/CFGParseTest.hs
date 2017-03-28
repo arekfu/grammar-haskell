@@ -16,7 +16,7 @@ import Grammar.Regex
 prop_parseShowIdempotence :: AQuoting -> ACharCFG -> Property
 prop_parseShowIdempotence (AQuoting q@NoQuoting) (ACharCFG g) = parseShowIdempotence q g
 prop_parseShowIdempotence (AQuoting q@(Quoting l r)) (ACharCFG g) =
-    (ReprChar l) `isNotInGrammar` g && (ReprChar r) `isNotInGrammar` g ==> parseShowIdempotence q g
+    ReprChar l `isNotInGrammar` g && ReprChar r `isNotInGrammar` g ==> parseShowIdempotence q g
 
 parseShowIdempotence :: Quoting -> CharCFG -> Property
 parseShowIdempotence q g =
