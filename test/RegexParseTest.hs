@@ -9,19 +9,25 @@ import Data.Coerce
 
 -- local imports
 import SymbolsTest (NonTerminal(..))
-import RegexTest (ARegex(..), AQuoting(..))
+import RegexTest (ARegex(..), AQuotingPolicy(..))
 import Grammar.Regex
 import Grammar.Regex.Parse
 
-prop_parseShowIdempotence :: AQuoting -> ARegex NonTerminal -> Property
-prop_parseShowIdempotence (AQuoting q) (ARegex r) =
+prop_parseShowIdempotence :: AQuotingPolicy -> ARegex NonTerminal -> Property
+prop_parseShowIdempotence (AQuotingPolicy q) (ARegex r) =
     let r' = coerce r
         rstr = showRegexWith q r'
-     in hasQuoting q || not (isRegexEmpty r) ==>
+     in parseShowIdempotence q rstr r'
+
+parseShowIdempotence :: QuotingPolicy -> String -> Regex Char -> Property
+parseShowIdempotence q@NoQuoting rstr r = not (isRegexEmpty r) ==> assertIdempotence q rstr r
+parseShowIdempotence q@(Quoting _ _) rstr r = assertIdempotence q rstr r
+
+assertIdempotence :: QuotingPolicy -> String -> Regex Char -> Property
+assertIdempotence q rstr r =
         case runParser regexParser q "parseShowIdempotence" rstr of
             Left parseError -> counterexample ("Parsing failed\n  regex: " ++ rstr ++ "\n  error: " ++ show parseError) False
-            Right r'' -> simplify r' === simplify r''
-
+            Right r' -> simplify r === simplify r'
 
 return []
 runTests :: IO Bool

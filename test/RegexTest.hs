@@ -2,7 +2,7 @@
 
 module RegexTest
 ( ARegex(..)
-, AQuoting(..)
+, AQuotingPolicy(..)
 , runTests
 , printExamples
 ) where
@@ -20,9 +20,9 @@ import Data.List (notElem)
 import SymbolsTest (NonTerminal(..))
 import Grammar.Regex
 
-newtype AQuoting = AQuoting { unAQuoting :: Quoting } deriving (Eq, Ord, Show)
+newtype AQuotingPolicy = AQuotingPolicy { unAQuotingPolicy :: QuotingPolicy } deriving (Eq, Ord, Show)
 
-instance Arbitrary AQuoting where
+instance Arbitrary AQuotingPolicy where
     arbitrary = do leftQuote <- arbitrary `suchThat` (\c -> (isPunctuation c || isSymbol c) && c `notElem` reservedChars)
                    rightQuote <- arbitrary `suchThat` (\c -> (isPunctuation c || isSymbol c) && c `notElem` reservedChars)
                    elements $ coerce [NoQuoting, Quoting leftQuote rightQuote]

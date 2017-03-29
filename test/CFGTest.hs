@@ -17,6 +17,7 @@ import Control.DeepSeq (NFData)
 
 -- local imports
 import Grammar.CFG
+import Grammar.Regex
 import SymbolsTest
 import RegexTest (ARegex(..))
 
@@ -119,7 +120,7 @@ prop_simplifyIdempotenceIntCFG (AIntCFG g) = let g' = simplifyIntCFG g in g' ===
 prop_allSymbolsAreInGrammar :: ACharCFG -> Property
 prop_allSymbolsAreInGrammar (ACharCFG g) =
     conjoin $
-        map (\s -> counterexample ("missing symbol: " ++ show s) $ s `isInGrammar` g)
+        map (\s -> counterexample ("missing symbol: " ++ showSymbol s) $ s `isInGrammar` g)
             $ S.toList $ getSymbols g
 
 prop_terminalsDisjointNonterminals :: ACharCFG -> Bool
@@ -128,13 +129,13 @@ prop_terminalsDisjointNonterminals (ACharCFG g) = null $ getTerminals g `S.inter
 prop_terminalsHaveNoProductions :: ACharCFG -> Property
 prop_terminalsHaveNoProductions (ACharCFG g) =
     conjoin $
-        map (\s -> counterexample ("failing symbol: " ++ show s) $ null $ productions g s)
+        map (\s -> counterexample ("failing symbol: " ++ showSymbol s) $ null $ productions g s)
             $ S.toList $ getTerminals g
 
 prop_nonTerminalsHaveProductions :: ACharCFG -> Property
 prop_nonTerminalsHaveProductions (ACharCFG g) =
     conjoin $
-        map (\s -> counterexample ("failing symbol: " ++ show s) $ not $ null $ productions g s)
+        map (\s -> counterexample ("failing symbol: " ++ showSymbol s) $ not $ null $ productions g s)
             $ S.toList $ getNonTerminals g
 
 prop_simplifyIdempotenceCharCFG :: ACharCFG -> Property

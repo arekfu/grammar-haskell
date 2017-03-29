@@ -12,12 +12,12 @@ context-free grammars.
 -}
 
 module Grammar.Regex
-( Quoting(..)
+( ShowSymbol(..)
+, QuotingPolicy(..)
 , quote
-, hasQuoting
-, Escape(..)
+, quoteString
 , escapeChar
-, showSymbol
+, escape
 , Regex(..)
 , isRegexEmpty
 , showRegex
@@ -40,33 +40,28 @@ import Data.Foldable (Foldable, foldr)
 import qualified Data.Set as S
 
 
+class ShowSymbol a where
+    showSymbol :: a -> String
 
-data Quoting = Quoting Char Char
-             | NoQuoting
-             deriving (Eq, Ord, Show, Generic, NFData)
+instance ShowSymbol Char where showSymbol c = [c]
 
-quote :: Quoting -> String -> String
-quote (Quoting left right) s = left : s ++ [right]
-quote NoQuoting s = s
+data QuotingPolicy = Quoting Char Char
+                   | NoQuoting
+                   deriving (Eq, Ord, Show, Generic, NFData)
 
-hasQuoting :: Quoting -> Bool
-hasQuoting NoQuoting = False
-hasQuoting _ = True
+quote :: ShowSymbol a => QuotingPolicy -> a -> String
+quote q sym = quoteString q $ showSymbol sym
 
-escapeChar :: Char -> String
-escapeChar c | c `elem` reservedChars = ['\\', c]
-             | otherwise = [c]
+quoteString :: QuotingPolicy -> String -> String
+quoteString (Quoting left right) str = left : escape [left, right] str ++ [right]
+quoteString NoQuoting str = escape reservedChars str
 
-class Escape a where
-    -- | Escape special characters when representing a symbol as a String
-    escape :: a -> String
+escapeChar :: String -> Char -> String
+escapeChar reserved c | c `elem` reserved = ['\\', c]
+                      | otherwise = [c]
 
-instance Escape Char where
-    escape = escapeChar
-
--- | Convert a symbol to a 'String'.
-showSymbol :: Escape a => Quoting -> a -> String
-showSymbol q s = quote q $ escape s
+escape :: String -> String -> String
+escape reserved = concatMap (escapeChar reserved)
 
 {- | The Regex datatype.
 -}
@@ -106,22 +101,22 @@ bracketed r0 r1 s = if r0 `needsBracketsWithin` r1
                     then "(" ++ s ++ ")"
                     else s
 
-showRegexWith :: Escape a => Quoting -> Regex a -> String
-showRegexWith q Empty = quote q ""
-showRegexWith q (Lit a) = showSymbol q a
+showRegexWith :: ShowSymbol a => QuotingPolicy -> Regex a -> String
+showRegexWith q Empty = quoteString q ""
+showRegexWith q (Lit a) = quote q a
 showRegexWith q r0@(Star r) = bracketed r r0 (showRegexWith q r) ++ "*"
 showRegexWith q r0@(Plus r) = bracketed r  r0 (showRegexWith q r) ++ "+"
 showRegexWith q r0@(QuestionMark r) = bracketed r r0 (showRegexWith q r) ++ "?"
 showRegexWith q r0@(Concat rs) = concatMap (\r -> bracketed r r0 $ showRegexWith q r) rs
 showRegexWith q r0@(Alt rs) = intercalate "|" $ map (\r -> bracketed r r0 $ showRegexWith q r) rs
 
-showRegex :: Escape a => Regex a -> String
+showRegex :: ShowSymbol a => Regex a -> String
 showRegex = showRegexWith NoQuoting
 
-showRegexQuoted :: Escape a => Regex a -> String
+showRegexQuoted ::ShowSymbol a => Regex a -> String
 showRegexQuoted = showRegexWith (Quoting '"' '"')
 
-showRegexBracketed :: Escape a => Regex a -> String
+showRegexBracketed ::ShowSymbol a => Regex a -> String
 showRegexBracketed = showRegexWith (Quoting '<' '>')
 
 instance Functor Regex where

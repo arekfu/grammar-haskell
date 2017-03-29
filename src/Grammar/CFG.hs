@@ -131,24 +131,24 @@ class Grammar g where
    >>> putStrLn $ showProductions exampleGrammar 'E'
    E := E+E | E*E | (E) | I
 -}
-showProductions :: (Grammar g, Escape (Repr g))
-                => g            -- ^ the grammar
-                -> Quoting      -- ^ the quoting policy
-                -> Repr g       -- ^ the symbol on the left-hand side of the rule
-                -> String       -- ^ the pretty-printed production rule
+showProductions :: (Grammar g, ShowSymbol (Repr g))
+                => g                -- ^ the grammar
+                -> QuotingPolicy    -- ^ the quoting policy
+                -> Repr g           -- ^ the symbol on the left-hand side of the rule
+                -> String           -- ^ the pretty-printed production rule
 showProductions grammar quoting sym =
-    let header = showSymbol quoting sym
+    let header = quote quoting sym
         prod = productions grammar sym
      in case prod of
-            Nothing   -> header ++ " := " ++ quote quoting "" ++ "\n"
+            Nothing   -> header ++ " := " ++ quoteString quoting "" ++ "\n"
             Just rule -> header ++ " := " ++ showRegexWith quoting rule ++ "\n"
 
 
 {- | Show all the production rules in a grammar, in Backus-Naur form, using a
      specified quoting policy.
 -}
-showGrammarWith :: (Grammar g, Escape (Repr g))
-                => Quoting                  -- ^ the quoting policy
+showGrammarWith :: (Grammar g, ShowSymbol (Repr g))
+                => QuotingPolicy            -- ^ the quoting policy
                 -> g                        -- ^ the grammar
                 -> String                   -- ^ its pretty-printed representation as a String
 showGrammarWith quoting grammar = let syms = S.toList $ getNonTerminals grammar
@@ -161,7 +161,7 @@ showGrammarWith quoting grammar = let syms = S.toList $ getNonTerminals grammar
    E := E+E | E*E | (E) | I
    I := a | b | c | Ia | Ib | Ic | I0 | I1 | I2 | I3
 -}
-showGrammar :: (Grammar g, Escape (Repr g))
+showGrammar :: (Grammar g, ShowSymbol (Repr g))
             => g                        -- ^ the grammar
             -> String                   -- ^ its pretty-printed representation as a String
 showGrammar = showGrammarWith NoQuoting
@@ -171,15 +171,15 @@ showGrammar = showGrammarWith NoQuoting
 {- | Pretty-print all the production rules in a grammar using an external
      function to display lists of production rules.
 -}
-pPrintGrammarWith :: (Grammar g, Escape (Repr g))
-                  => Quoting                  -- ^ the quoting policy
+pPrintGrammarWith :: (Grammar g, ShowSymbol (Repr g))
+                  => QuotingPolicy            -- ^ the quoting policy
                   -> g                        -- ^ the grammar
                   -> String                   -- ^ its pretty-printed representation as a String
 pPrintGrammarWith quoting grammar = let syms = S.toList $ getNonTerminals grammar
                                         prods = concatMap (showProductions grammar quoting) syms
-                                        start = "\nStart: " ++ showSymbol quoting (startSymbol grammar)
-                                        terms = "\nTerminals: " ++ show (S.map (showSymbol quoting) $ getTerminals grammar)
-                                        nonterms = "\nNonterminals: " ++ show (S.map (showSymbol quoting) $ getNonTerminals grammar)
+                                        start = "\nStart: " ++ quote quoting (startSymbol grammar)
+                                        terms = "\nTerminals: " ++ show (S.map (quote quoting) $ getTerminals grammar)
+                                        nonterms = "\nNonterminals: " ++ show (S.map (quote quoting) $ getNonTerminals grammar)
                                      in prods ++ start ++ terms ++ nonterms
 
 
@@ -336,7 +336,7 @@ instance Grammar IntCFG where
     getNonTerminals = S.map ReprInt . getNonTerminalsInt
     startSymbol _ = ReprInt 0
 
-instance Escape (Repr IntCFG) where escape = show
+instance ShowSymbol (Repr IntCFG) where showSymbol (ReprInt i) = show i
 
 {- | Apply 'Grammar.Regex.simplify' to all the 'Regex'es used in the grammar.
 -}
@@ -547,7 +547,7 @@ instance (Eq a, Ord a) => Grammar (CFG a) where
     getNonTerminals = S.map ReprCFG . getNonTerminalsCFG
     startSymbol = ReprCFG . startSymbolCFG
 
-instance Show a => Escape (Repr (CFG a)) where escape (ReprCFG s) = concatMap escapeChar $ show s
+instance Show a => ShowSymbol (Repr (CFG a)) where showSymbol (ReprCFG s) = show s
 
 
 {- | Apply 'Grammar.Regex.simplify' to all the 'Regex'es used in the grammar.
@@ -582,9 +582,9 @@ instance Grammar CharCFG where
     getNonTerminals (CharCFG g) = S.map ReprChar $ getNonTerminalsCFG g
     startSymbol (CharCFG g) = ReprChar $ startSymbolCFG g
 
-instance Show (Repr CharCFG) where show (ReprChar c) = [c]
+instance ShowSymbol (Repr CharCFG) where showSymbol (ReprChar c) = [c]
 
-instance Escape (Repr CharCFG) where escape (ReprChar c) = escapeChar c
+instance Show (Repr CharCFG) where show = showSymbol
 
 -- | Build a 'CharCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
@@ -627,9 +627,9 @@ instance Grammar StringCFG where
     getNonTerminals (StringCFG g) = S.map ReprString $ getNonTerminalsCFG g
     startSymbol (StringCFG g) = ReprString $ startSymbolCFG g
 
-instance Show (Repr StringCFG) where show = unReprString
+instance ShowSymbol (Repr StringCFG) where showSymbol = unReprString
 
-instance Escape (Repr StringCFG) where escape = concatMap escapeChar . unReprString
+instance Show (Repr StringCFG) where show = showSymbol
 
 -- | Build a 'StringCFG' from an association list of production rules -- see 'productionsToCFG'.
 productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG

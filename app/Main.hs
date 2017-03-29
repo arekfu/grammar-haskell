@@ -6,16 +6,13 @@ import Grammar.MC
 
 import System.Clock
 
-exampleKeyValue :: [(Char, [String])]
-exampleKeyValue = let initialChars = map (:[]) ['a'..'c']
-                      chars = ['a'..'c'] ++ ['0'..'3']
-                      expansions = map (\c -> ['I', c]) chars
-                   in [ ('E', ["E+E", "E*E", "(E)", "I"])
-                      , ('I', initialChars ++ expansions)
-                      ]
+exampleGrammarString :: String
+exampleGrammarString = "\
+\ 'E' := 'E' '+' 'E' | 'E' '*' 'E' | '(' 'E' ')' | 'I'\n\
+\ 'I' := 'a' | 'b' | 'c' | 'I' 'a' | 'I' 'b' | 'I' 'c'"
 
 exampleGrammar :: CharCFG
-exampleGrammar = productionsToCharCFG 'E' exampleKeyValue
+exampleGrammar = parseCharCFG (Quoting '\'' '\'') 'E' exampleGrammarString
 
 digitsKeyValue :: [(String, [[String]])]
 digitsKeyValue = [ ("<S>", [["-", "<FN>"], ["<FN>"]])
@@ -34,12 +31,13 @@ main = do
           let expansion = randomGrammarDeriveScan exampleGrammar
           TimeSpec _ seed <- getTime Realtime
           let strings = take 20 $ evalMC expansion $ fromIntegral seed
-          mapM_ (putStrLn . concatMap (showSymbol NoQuoting)) strings
+          mapM_ (putStrLn . concatMap (quote NoQuoting)) strings
           putStrLn ""
           -- digits grammar
           putStrLn $ showGrammar digitsGrammar
           let digitExpansion = randomGrammarDerive digitsGrammar
-          putStrLn $ concatMap (showSymbol NoQuoting) $ evalMC digitExpansion $ fromIntegral seed
+          putStrLn $ concatMap (quote NoQuoting) $ evalMC digitExpansion $ fromIntegral seed
           putStrLn ""
           -- examine the structureof the regexes
-          print $ productions digitsGrammar (ReprString "<D>")
+          let (Just rs) = productions digitsGrammar (ReprString "<D>")
+          putStrLn $ showRegex rs

@@ -27,19 +27,23 @@ module Grammar
 -- * Context-free grammars over alphabets of specific types
 , CharCFG
 , productionsToCharCFG
+, parseCharCFG
 , StringCFG
 , productionsToStringCFG
 -- * Random grammar derivation
 , randomGrammarDerive
 , randomGrammarDeriveScan
 , module Grammar.Regex
+, module Grammar.Regex.Parse
 , module Grammar.Regex.Random
 ) where
 
 -- local imports
 import Grammar.CFG
+import Grammar.CFG.Parse
 import Grammar.CFG.Random
 import Grammar.Regex
+import Grammar.Regex.Parse
 import Grammar.Regex.Random
 
 {- $examplegrammar #examplegrammar#
