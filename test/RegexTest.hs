@@ -23,9 +23,9 @@ import Grammar.Regex
 newtype AQuotingPolicy = AQuotingPolicy { unAQuotingPolicy :: QuotingPolicy } deriving (Eq, Ord, Show)
 
 instance Arbitrary AQuotingPolicy where
-    arbitrary = do leftQuote <- arbitrary `suchThat` (\c -> (isPunctuation c || isSymbol c) && c `notElem` reservedChars)
-                   rightQuote <- arbitrary `suchThat` (\c -> (isPunctuation c || isSymbol c) && c `notElem` reservedChars)
-                   elements $ coerce [NoQuoting, Quoting leftQuote rightQuote]
+    arbitrary = do left <- arbitrary `suchThat` (\c -> (isPunctuation c || isSymbol c) && c `notElem` reservedChars)
+                   right <- arbitrary `suchThat` (\c -> (isPunctuation c || isSymbol c) && c `notElem` reservedChars)
+                   elements $ coerce [NoQuoting, Quoting left right]
 
 newtype ARegex a = ARegex { unARegex :: Regex a } deriving (Eq, Ord, Show)
 

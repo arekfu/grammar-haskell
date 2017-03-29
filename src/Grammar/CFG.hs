@@ -19,7 +19,6 @@ module Grammar.CFG
   Grammar(..)
 , allProductions
 -- ** Pretty-printing parts of a grammar
--- $examplegrammar
 , showProductions
 , showGrammarWith
 , showGrammar
@@ -591,7 +590,7 @@ productionsToCharCFG :: Char -> [(Char, [String])] -> CharCFG
 productionsToCharCFG start = CharCFG . productionsToCFG start
 
 {- | Build a 'CharCFG' from an association list of @(symbol, symbol regex)@
-     pairs -- see @regexesToCFG@.
+     pairs -- see 'regexesToCFG'.
 -}
 regexesToCharCFG :: Char -> [(Char, Regex Char)] -> CharCFG
 regexesToCharCFG start = CharCFG . regexesToCFG start
@@ -636,7 +635,7 @@ productionsToStringCFG :: String -> [(String, [[String]])] -> StringCFG
 productionsToStringCFG start = StringCFG . productionsToCFG start
 
 {- | Build a 'StringCFG' from an association list of @(symbol, symbol regex)@
-     pairs -- see @regexesToCFG@.
+     pairs -- see 'regexesToCFG'.
 -}
 regexesToStringCFG :: String -> [(String, Regex String)] -> StringCFG
 regexesToStringCFG start = StringCFG . regexesToCFG start

@@ -12,7 +12,6 @@ expressions.
 -}
 
 
-
 module Grammar.Regex.Random
 ( randomExpandRegex
 ) where
@@ -28,6 +27,10 @@ import Grammar.MC
 expConstant :: Double
 expConstant = 3.0
 
+{- | Perform random expansion of a 'Regex' and return a string in the resulting
+     language. The string is actually a list of symbols and is returned in the
+     'Grammar.MC.MC' monad, because it is a random value.
+-}
 randomExpandRegex :: Regex a -> MC [a]
 randomExpandRegex Empty = return []
 randomExpandRegex (Lit x) = return [x]

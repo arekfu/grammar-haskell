@@ -21,7 +21,6 @@ module Grammar.MC
 , getGen
 , uniform
 , uniformInt
-, uniforms
 , sampleExp
 , pickRandom
 ) where
@@ -60,9 +59,12 @@ evalMC obj seed = let initialGen = mkTFGen seed
 --  some machinery to sample random numbers  --
 -----------------------------------------------
 
+-- | Extract the random-number generator.
 getGen :: (RandomGen g, MonadState g m) => m g
 getGen = get
 
+-- | Return a uniformly distributed 'Fractional' random number between 0 and 1.
+--   The interval bounds may or may not be included.
 uniform :: (RandomGen g, Fractional a, MonadState g m) => m a
 uniform = do
     gen <- getGen
@@ -71,17 +73,17 @@ uniform = do
     put gen'
     return xi
 
-uniformInt :: (RandomGen g, Random a, Integral a, MonadState g m) => a -> a -> m a
+-- | Return a uniformly distributed integer between the specified minimum and
+--   maximum values (included).
+uniformInt :: (RandomGen g, Random a, Integral a, MonadState g m)
+           => a     -- ^ the minimum value
+           -> a     -- ^ the maximum value
+           -> m a   -- ^ the sampled value
 uniformInt minVal maxVal = do
     gen <- getGen
     let (xi, gen') = randomR (minVal, maxVal) gen
     put gen'
     return xi
-
-uniforms :: (RandomGen g, Fractional a, MonadState g m)
-         => Int
-         -> m [a]
-uniforms n = replicateM n uniform
 
 -- | Sample from an exponential distribution of the form
 -- @

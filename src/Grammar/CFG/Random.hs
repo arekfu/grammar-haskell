@@ -39,6 +39,10 @@ import Grammar.Regex.Random (randomExpandRegex)
 --  functions to randomly derive sequences of symbols  --
 ---------------------------------------------------------
 
+{- | A typeclass for random generation of language strings starting from a
+     grammar specification, in the form of a type of the 'Grammar.CFG.Grammar'
+     class.
+-}
 class (Grammar g, Ord (Repr g)) => RandomGrammar g where
 
     -- | Recursively and randomly expand a word until it consists solely of

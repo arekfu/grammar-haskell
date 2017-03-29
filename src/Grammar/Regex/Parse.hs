@@ -1,3 +1,19 @@
+{-|
+Module      : Grammar.Regex.Parse
+Description : Parsec parser for the Regex datatype.
+Copyright   : (c) Davide Mancusi, 2017
+License     : BSD3
+Maintainer  : arekfu@gmail.com
+Stability   : experimental
+Portability : POSIX
+
+This module contains a 'Text.Parsec' parser that can be used to construct
+'Regex'es from their 'String' representation. We try (and test!) to enforce
+that parsing and showing (using 'showRegexWith') are inverse of each other,
+provided that the same quoting policy is applied.
+-}
+
+
 module Grammar.Regex.Parse
 ( regexParser
 , whitespace
@@ -12,10 +28,14 @@ import Control.Monad (void)
 -- local imports
 import Grammar.Regex
 
+{- | Skip any amount of whitespace. It differs from 'Text.Parsec.Char.spaces'
+   because the latter skips all characters for which 'isSpace' is 'True', which
+   includes newlines.
+-}
 whitespace :: Stream s m Char => ParsecT s QuotingPolicy m ()
 whitespace = skipMany $ oneOf [' ', '\t']
 
--- | Modify a parser to skip any following whitespace
+-- | Modify a parser to skip any following whitespace.
 lexeme :: Stream s m Char => ParsecT s QuotingPolicy m a -> ParsecT s QuotingPolicy m a
 lexeme p = do whitespace
               x <- p
@@ -25,6 +45,7 @@ lexeme p = do whitespace
 parens :: Stream s m Char => ParsecT s QuotingPolicy m a -> ParsecT s QuotingPolicy m a
 parens = lexeme . between (char '(')  (char ')')
 
+-- | A Parsec parser for 'Regex'es.
 regexParser :: Stream s m Char => ParsecT s QuotingPolicy m (Regex Char)
 regexParser = alt <* (choice [void newline, eof] <?> "end of input")
 
@@ -64,6 +85,7 @@ symbolOrEmpty =
            NoQuoting      -> return ()
        choice [empty, Lit <$> lit] <?> "identifier or empty"
 
+-- | Parse a non-empty 'Regex' symbol.
 symbol :: Stream s m Char => ParsecT s QuotingPolicy m Char
 symbol = do quoting <- getState
             case quoting of
