@@ -12,30 +12,38 @@ to represent and manipulate context-free grammars.
 -}
 module Grammar
 (
--- * The 'Grammar' typeclass
+-- * Context-free grammars
+-- ** The 'Grammar' typeclass
   Grammar(..)
--- ** Pretty-printing parts of a grammar
--- $examplegrammar
-, showProductions
-, showGrammar
--- * Context-free grammars over alphabets of integers
+, Repr(..)
+-- ** Context-free grammars over alphabets of integers
 , IntCFG
 , productionsToIntCFG
--- * Context free grammars over alphabets of arbitrary types
+-- ** Context free grammars over alphabets of arbitrary types
 , CFG
 , productionsToCFG
--- * Context-free grammars over alphabets of specific types
+-- ** Context-free grammars over alphabets of specific types
 , CharCFG
 , productionsToCharCFG
 , parseCharCFG
 , StringCFG
 , productionsToStringCFG
+-- ** Pretty-printing parts of a grammar
+-- $examplegrammar
+, showProductions
+, showGrammar
+, showGrammarWith
+, QuotingPolicy(..)
+, quote
+-- * Regular expressions
+, Regex
+, showRegex
+, showRegexWith
 -- * Random grammar derivation
+, MC
+, evalMC
 , randomGrammarDerive
 , randomGrammarDeriveScan
-, module Grammar.Regex
-, module Grammar.Regex.Parse
-, module Grammar.Regex.Random
 ) where
 
 -- local imports
@@ -43,8 +51,7 @@ import Grammar.CFG
 import Grammar.CFG.Parse
 import Grammar.CFG.Random
 import Grammar.Regex
-import Grammar.Regex.Parse
-import Grammar.Regex.Random
+import Grammar.MC
 
 {- $examplegrammar #examplegrammar#
    We illustrate the pretty-printing functionality with the following example grammar:

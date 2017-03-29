@@ -1,8 +1,6 @@
 module Main where
 
 import Grammar
-import Grammar.CFG
-import Grammar.MC
 
 import System.Clock
 
