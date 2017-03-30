@@ -30,15 +30,21 @@ module Grammar
 , productionsToStringCFG
 -- ** Pretty-printing parts of a grammar
 -- $examplegrammar
+, showSymbol
+, showWord
 , showProductions
 , showGrammar
-, showGrammarWith
+, showGrammarUnquoted
+, showGrammarQuoted
+, showGrammarChevrons
 , QuotingPolicy(..)
 , quote
 -- * Regular expressions
 , Regex
 , showRegex
-, showRegexWith
+, showRegexUnquoted
+, showRegexQuoted
+, showRegexChevrons
 -- * Random grammar derivation
 , MC
 , evalMC

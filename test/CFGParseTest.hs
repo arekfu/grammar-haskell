@@ -20,7 +20,7 @@ prop_parseShowIdempotence (AQuotingPolicy q@(Quoting l r)) (ACharCFG g) =
 
 parseShowIdempotence :: QuotingPolicy -> CharCFG -> Property
 parseShowIdempotence q g =
-    let gstr = showGrammarWith q g
+    let gstr = runQuoted (showGrammar g) q
         ReprChar start = startSymbol g
      in case runParser cfgParser q "parseShowIdempotence" gstr of
             Left parseError -> counterexample ("Parsing failed\n  grammar:\n" ++ gstr ++ "\n  error: " ++ show parseError) False

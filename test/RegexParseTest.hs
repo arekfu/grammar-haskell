@@ -16,7 +16,7 @@ import Grammar.Regex.Parse
 prop_parseShowIdempotence :: AQuotingPolicy -> ARegex NonTerminal -> Property
 prop_parseShowIdempotence (AQuotingPolicy q) (ARegex r) =
     let r' = coerce r
-        rstr = showRegexWith q r'
+        rstr = runQuoted (showRegex r') q
      in parseShowIdempotence q rstr r'
 
 parseShowIdempotence :: QuotingPolicy -> String -> Regex Char -> Property

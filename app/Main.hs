@@ -25,17 +25,17 @@ digitsGrammar = productionsToStringCFG "<S>" digitsKeyValue
 main :: IO ()
 main = do
           -- example grammar
-          putStrLn $ showGrammar exampleGrammar
+          putStrLn $ showGrammarUnquoted exampleGrammar
           let expansion = randomGrammarDeriveScan exampleGrammar
           TimeSpec _ seed <- getTime Realtime
           let strings = take 20 $ evalMC expansion $ fromIntegral seed
-          mapM_ (putStrLn . concatMap (quote NoQuoting)) strings
+          mapM_ (putStrLn . showWord) strings
           putStrLn ""
           -- digits grammar
-          putStrLn $ showGrammar digitsGrammar
+          putStrLn $ showGrammarUnquoted digitsGrammar
           let digitExpansion = randomGrammarDerive digitsGrammar
-          putStrLn $ concatMap (quote NoQuoting) $ evalMC digitExpansion $ fromIntegral seed
+          putStrLn $ showWord $ evalMC digitExpansion $ fromIntegral seed
           putStrLn ""
           -- examine the structureof the regexes
           let (Just rs) = productions digitsGrammar (ReprString "<D>")
-          putStrLn $ showRegex rs
+          putStrLn $ showRegexUnquoted rs

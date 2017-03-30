@@ -13,7 +13,10 @@ context-free grammars.
 
 module Grammar.Regex
 ( ShowSymbol(..)
+, showWord
 , QuotingPolicy(..)
+, Quoted
+, runQuoted
 , quote
 , quoteString
 , escapeChar
@@ -21,9 +24,9 @@ module Grammar.Regex
 , Regex(..)
 , isRegexEmpty
 , showRegex
-, showRegexWith
+, showRegexUnquoted
 , showRegexQuoted
-, showRegexBracketed
+, showRegexChevrons
 , needsBracketsWithin
 , bracketed
 , simplify
@@ -38,6 +41,7 @@ import Control.DeepSeq (NFData)
 import Data.List (intercalate)
 import Data.Foldable (Foldable, foldr)
 import qualified Data.Set as S
+import Control.Monad.Reader (Reader, runReader, ask)
 
 
 -- | A class that provides a method that specifies how symbols should be
@@ -48,6 +52,12 @@ class ShowSymbol a where
     showSymbol :: a -> String
 
 instance ShowSymbol Char where showSymbol c = [c]
+
+-- | Convert a string of symbols to a 'String'
+showWord :: ShowSymbol a
+         => [a]             -- ^ the string of symbols
+         -> String          -- ^ the resulting string representation
+showWord = concatMap showSymbol
 
 -- | This datatype defines a quoting policy for symbols.
 data QuotingPolicy =
@@ -62,20 +72,30 @@ data QuotingPolicy =
     | NoQuoting
     deriving (Eq, Ord, Show, Generic, NFData)
 
+-- | A type synonim to the 'Reader' monad to thread the quoting policy more
+-- easily.
+type Quoted a = Reader QuotingPolicy a
+
+-- | Run the quoting action.
+runQuoted :: Reader QuotingPolicy a
+          -> QuotingPolicy
+          -> a
+runQuoted = runReader
+
 -- | Transform a symbol to a 'String', possibly quoting it and escaping all
 --   necessary characters.
 quote :: ShowSymbol a
-      => QuotingPolicy  -- ^ the quoting policy to apply
-      -> a              -- ^ the symbol to represent
-      -> String         -- ^ the resulting representation
-quote q sym = quoteString q $ showSymbol sym
+      => a              -- ^ the symbol to represent
+      -> Quoted String  -- ^ the resulting representation
+quote sym = quoteString $ showSymbol sym
 
 -- | Apply quoting and escaping to an existing string.
-quoteString :: QuotingPolicy    -- ^ the quoting policy to apply
-            -> String           -- ^ the string to quote
-            -> String           -- ^ the quoted, escaped string
-quoteString (Quoting left right) str = left : escape [left, right] str ++ [right]
-quoteString NoQuoting str = escape reservedChars str
+quoteString :: String           -- ^ the string to quote
+            -> Quoted String    -- ^ the quoted, escaped string
+quoteString str = do quoting <- ask
+                     case quoting of
+                         (Quoting left right) -> return $ left : escape [left, right] str ++ [right]
+                         NoQuoting            -> return $ escape reservedChars str
 
 -- | Escape a character, if it is reserved.
 escapeChar :: String    -- ^ the list of reserved characters
@@ -163,41 +183,40 @@ _ `needsBracketsWithin` _ = False
 
 -- | Transform a 'Regex' into a 'String' and add brackets if necessary.
 bracketed :: ShowSymbol a
-          => QuotingPolicy  -- ^ the quoting policy
-          -> Regex a        -- ^ the outer 'Regex'
+          => Regex a        -- ^ the outer 'Regex'
           -> Regex a        -- ^ the inner 'Regex'
-          -> String         -- ^ the 'String' representation
-bracketed q rout rin = let s = showRegexWith q rin
-                       in if rin `needsBracketsWithin` rout
-                          then "(" ++ s ++ ")"
-                          else s
+          -> Quoted String  -- ^ the 'String' representation
+bracketed rout rin = do s <- showRegex rin
+                        if rin `needsBracketsWithin` rout
+                        then return $ "(" ++ s ++ ")"
+                        else return s
 
 -- | Transform a 'Regex' into a 'String' using the given 'QuotingPolicy'.
-showRegexWith :: ShowSymbol a
-              => QuotingPolicy  -- ^ the quoting policy
-              -> Regex a        -- ^ the 'Regex' to transform
-              -> String         -- ^ the resulting 'String
-showRegexWith q Empty = quoteString q ""
-showRegexWith q (Lit a) = quote q a
-showRegexWith q r0@(Star r) = bracketed q r0 r ++ "*"
-showRegexWith q r0@(Plus r) = bracketed q r0 r ++ "+"
-showRegexWith q r0@(QuestionMark r) = bracketed q r0 r ++ "?"
-showRegexWith q r0@(Concat rs) = concatMap (bracketed q r0) rs
-showRegexWith q r0@(Alt rs) = intercalate "|" $ map (bracketed q r0) rs
+showRegex :: ShowSymbol a
+          => Regex a        -- ^ the 'Regex' to transform
+          -> Quoted String  -- ^ the resulting 'String
+showRegex Empty = quoteString ""
+showRegex (Lit a) = quote a
+showRegex r0@(Star r) = (++ "*") <$> bracketed r0 r
+showRegex r0@(Plus r) = (++ "+") <$> bracketed r0 r
+showRegex r0@(QuestionMark r) = (++ "?") <$> bracketed r0 r
+showRegex r0@(Concat rs) = concat <$> mapM (bracketed r0) rs
+showRegex r0@(Alt rs) = intercalate "|" <$> mapM (bracketed r0) rs
 
--- | Transform a 'Regex' into a 'String' without any quoting.
-showRegex :: ShowSymbol a => Regex a -> String
-showRegex = showRegexWith NoQuoting
+-- | Transform a 'Regex' into a 'String', quote using double quotes ("like
+--   this").
+showRegexUnquoted ::ShowSymbol a => Regex a -> String
+showRegexUnquoted r = runQuoted (showRegex r) NoQuoting
 
 -- | Transform a 'Regex' into a 'String', quote using double quotes ("like
 --   this").
 showRegexQuoted ::ShowSymbol a => Regex a -> String
-showRegexQuoted = showRegexWith (Quoting '"' '"')
+showRegexQuoted r = runQuoted (showRegex r) (Quoting '"' '"')
 
 -- | Transform a 'Regex' into a 'String', quote using angle brackets (<like
 --   this>).
-showRegexBracketed ::ShowSymbol a => Regex a -> String
-showRegexBracketed = showRegexWith (Quoting '<' '>')
+showRegexChevrons ::ShowSymbol a => Regex a -> String
+showRegexChevrons r = runQuoted (showRegex r) (Quoting '<' '>')
 
 -- | Helper function to remove nested 'Concat' constructors.
 spliceConcat :: [Regex a] -> [Regex a]

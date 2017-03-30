@@ -20,8 +20,10 @@ module Grammar.CFG
 , allProductions
 -- ** Pretty-printing parts of a grammar
 , showProductions
-, showGrammarWith
 , showGrammar
+, showGrammarUnquoted
+, showGrammarQuoted
+, showGrammarChevrons
 , pPrintGrammarWith
 -- * Context-free grammars over alphabets of integers
 , IntCFG(..)
@@ -132,56 +134,82 @@ class Grammar g where
 -}
 showProductions :: (Grammar g, ShowSymbol (Repr g))
                 => g                -- ^ the grammar
-                -> QuotingPolicy    -- ^ the quoting policy
                 -> Repr g           -- ^ the symbol on the left-hand side of the rule
-                -> String           -- ^ the pretty-printed production rule
-showProductions grammar quoting sym =
-    let header = quote quoting sym
-        prod = productions grammar sym
-     in case prod of
-            Nothing   -> header ++ " := " ++ quoteString quoting "" ++ "\n"
-            Just rule -> header ++ " := " ++ showRegexWith quoting rule ++ "\n"
-
+                -> Quoted String    -- ^ the pretty-printed production rule
+showProductions grammar sym =
+     do header <- quote sym
+        let prod = productions grammar sym
+        rhs <- case prod of
+                   Nothing   -> quoteString ""
+                   Just rule -> showRegex rule
+        return $ header ++ " := " ++ rhs ++ "\n"
 
 {- | Show all the production rules in a grammar, in Backus-Naur form, using a
      specified quoting policy.
 -}
-showGrammarWith :: (Grammar g, ShowSymbol (Repr g))
-                => QuotingPolicy            -- ^ the quoting policy
-                -> g                        -- ^ the grammar
-                -> String                   -- ^ its pretty-printed representation as a String
-showGrammarWith quoting grammar = let syms = S.toList $ getNonTerminals grammar
-                                   in concatMap (showProductions grammar quoting) syms
+showGrammar :: (Grammar g, ShowSymbol (Repr g))
+            => g                -- ^ the grammar
+            -> Quoted String    -- ^ its pretty-printed representation as a String
+showGrammar grammar = do let syms = S.toList $ getNonTerminals grammar
+                         concat <$> mapM (showProductions grammar) syms
 
 
 {- | Show all the production rules in a grammar, in Backus-Naur form, without quoting.
 
-   >>> putStrLn $ showGrammar exampleGrammar
-   E := E+E | E*E | (E) | I
-   I := a | b | c | Ia | Ib | Ic | I0 | I1 | I2 | I3
+   >>> putStrLn $ showGrammarUnquoted exampleGrammar
+   E := E\+E | E\*E | \(E\) | I
+   I := a | b | c | Ia | Ib | Ic
 -}
-showGrammar :: (Grammar g, ShowSymbol (Repr g))
-            => g                        -- ^ the grammar
-            -> String                   -- ^ its pretty-printed representation as a String
-showGrammar = showGrammarWith NoQuoting
+showGrammarUnquoted :: (Grammar g, ShowSymbol (Repr g))
+                    => g        -- ^ the grammar
+                    -> String   -- ^ its pretty-printed representation as a String
+showGrammarUnquoted g = runQuoted (showGrammar g) NoQuoting
 
 
 
-{- | Pretty-print all the production rules in a grammar using an external
-     function to display lists of production rules.
+{- | Show all the production rules in a grammar, in Backus-Naur form, using
+     quotes for the symbols
+
+   >>> putStrLn $ showGrammarQuoted exampleGrammar
+   "E" := "E" "+" "E" | "E" "*" "E" | "(" "E" ")" | "I"
+   "I" := "a" | "b" | "c" | "I" "a" | "I" "b" | "I" "c"
+-}
+showGrammarQuoted :: (Grammar g, ShowSymbol (Repr g))
+                  => g        -- ^ the grammar
+                  -> String   -- ^ its pretty-printed representation as a String
+showGrammarQuoted g = runQuoted (showGrammar g) (Quoting '"' '"')
+
+
+
+{- | Show all the production rules in a grammar, in Backus-Naur form, using
+     quotes for the symbols
+
+   >>> putStrLn $ showGrammarQuoted exampleGrammar
+   "E" := "E" "+" "E" | "E" "*" "E" | "(" "E" ")" | "I"
+   "I" := "a" | "b" | "c" | "I" "a" | "I" "b" | "I" "c"
+-}
+showGrammarChevrons :: (Grammar g, ShowSymbol (Repr g))
+                    => g        -- ^ the grammar
+                    -> String   -- ^ its pretty-printed representation as a String
+showGrammarChevrons g = runQuoted (showGrammar g) (Quoting '<' '>')
+
+
+
+{- | Pretty-print all the production rules and all the sets of symbols in a
+     grammar.
 -}
 pPrintGrammarWith :: (Grammar g, ShowSymbol (Repr g))
-                  => QuotingPolicy            -- ^ the quoting policy
-                  -> g                        -- ^ the grammar
-                  -> String                   -- ^ its pretty-printed representation as a String
-pPrintGrammarWith quoting grammar = let syms = S.toList $ getNonTerminals grammar
-                                        prods = concatMap (showProductions grammar quoting) syms
-                                        start = "\nStart: " ++ quote quoting (startSymbol grammar)
-                                        terms = "\nTerminals: " ++ show (S.map (quote quoting) $ getTerminals grammar)
-                                        nonterms = "\nNonterminals: " ++ show (S.map (quote quoting) $ getNonTerminals grammar)
-                                     in prods ++ start ++ terms ++ nonterms
-
-
+                  => g                        -- ^ the grammar
+                  -> Quoted String            -- ^ its pretty-printed representation as a String
+pPrintGrammarWith grammar =
+    let syms = S.toList $ getNonTerminals grammar
+     in do prods <- concat <$> mapM (showProductions grammar) syms
+           start <- ("\nStart: " ++) <$> quote (startSymbol grammar)
+           terms <- mapM quote $ toList $ getTerminals grammar
+           let termString = "\nTerminals: " ++ show terms
+           nonterms <- mapM quote $ toList $ getNonTerminals grammar
+           let nontermString = "\nNonterminals: " ++ show nonterms
+           return $ prods ++ start ++ termString ++ nontermString
 
 ------------------------------------
 --  generic grammar manipulators  --
