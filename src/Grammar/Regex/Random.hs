@@ -24,8 +24,9 @@ import Grammar.MC
 --  randomly expand regexes  --
 -------------------------------
 
-expConstant :: Double
-expConstant = 3.0
+-- | Reduce the 'Regex' expansion size by this amount at each step.
+scaling :: Double
+scaling = 0.8
 
 {- | Perform random expansion of a 'Regex' and return a string in the resulting
      language. The string is actually a list of symbols and is returned in the
@@ -36,12 +37,14 @@ randomExpandRegex Empty = return []
 randomExpandRegex (Lit x) = return [x]
 randomExpandRegex (Concat xs) = concat <$> mapM randomExpandRegex xs
 randomExpandRegex (Alt xs) = randomExpandRegex =<< pickRandom xs
-randomExpandRegex (Star r) = do xi <- sampleExp expConstant
+randomExpandRegex (Star r) = do xi <- sampleSizedExp
                                 expanded <- randomExpandRegex r
+                                scaleSize scaling
                                 let n = round xi
                                 return $ concat $ replicate n expanded
-randomExpandRegex (Plus r) = do xi <- sampleExp expConstant
+randomExpandRegex (Plus r) = do xi <- sampleSizedExp
                                 expanded <- randomExpandRegex r
+                                scaleSize scaling
                                 let n = 1 + round xi
                                 return $ concat $ replicate n expanded
 randomExpandRegex (QuestionMark r) = do xi <- uniform :: MC Double
