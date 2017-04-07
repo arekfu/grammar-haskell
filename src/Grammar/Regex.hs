@@ -172,7 +172,6 @@ needsBracketsWithin :: Regex a -- ^ the
 (Star _) `needsBracketsWithin` (Star _) = True
 (Star _) `needsBracketsWithin` (Plus _) = True
 (Star _) `needsBracketsWithin` (QuestionMark _) = True
-(Star _) `needsBracketsWithin` (Concat _) = True
 (Plus _) `needsBracketsWithin` (Star _) = True
 (Plus _) `needsBracketsWithin` (Plus _) = True
 (Plus _) `needsBracketsWithin` (QuestionMark _) = True
