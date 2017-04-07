@@ -466,7 +466,7 @@ labelSymbols allSymbols = let labelsToSymbolsDict = V.fromList $ S.toList allSym
                            in (labelsToSymbolsDict, symbolsToLabelsDict)
 
 keyValuesToKeyRegex :: Ord a => [(a, [[a]])] -> [(a, Regex a)]
-keyValuesToKeyRegex = map (second (Alt . map (Concat . map Lit)))
+keyValuesToKeyRegex = map (second (mkAlt . map (Concat . map Lit)))
 
 labelKeyValues :: (Ord a, Functor f) => [(a, f a)] -> SymbolToLabelDict a -> [(Label, f Label)]
 labelKeyValues kvs dict =

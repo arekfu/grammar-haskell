@@ -35,7 +35,7 @@ instance Arbitrary a => Arbitrary (ARegex a) where
               aRegexSized n = frequency $ zip [5, 2, 1, 1, 1, 1] $ map (ARegex <$>)
                   [ Lit <$> arbitrary
                   , (Concat . coerce) <$> resize (n `div` 2) (listOf1 (arbitrary :: Gen (ARegex a)) `suchThat` (\l -> length l>1))
-                  , (Alt . coerce) <$> resize (n `div` 2) (listOf1 (arbitrary :: Gen (ARegex a)) `suchThat` (\l -> length l>1))
+                  , (mkAlt . coerce) <$> resize (n `div` 2) (listOf1 (arbitrary :: Gen (ARegex a)) `suchThat` (\l -> length l>1))
                   , (Star . coerce) <$> aRegexSized n
                   , (Plus . coerce) <$> aRegexSized n
                   , (QuestionMark . coerce) <$> aRegexSized n
@@ -44,7 +44,7 @@ instance Arbitrary a => Arbitrary (ARegex a) where
     shrink (ARegex Empty)            = []
     shrink (ARegex (Lit _))          = [ARegex Empty]
     shrink (ARegex (Concat rs))      = ARegex Empty : coerce rs
-    shrink (ARegex (Alt rs))         = ARegex Empty : coerce rs
+    shrink (ARegex (Alt rs _))       = ARegex Empty : coerce rs
     shrink (ARegex (Star r))         = [ARegex Empty, ARegex r]
     shrink (ARegex (Plus r))         = [ARegex Empty, ARegex r]
     shrink (ARegex (QuestionMark r)) = [ARegex Empty, ARegex r]

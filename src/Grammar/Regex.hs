@@ -22,6 +22,7 @@ module Grammar.Regex
 , escapeChar
 , escape
 , Regex(..)
+, mkAlt
 , isRegexEmpty
 , showRegex
 , showRegexUnquoted
@@ -43,6 +44,8 @@ import Data.Foldable (Foldable, foldr)
 import qualified Data.Set as S
 import Control.Monad.Reader (Reader, runReader, ask)
 
+-- local imports
+import Grammar.Size
 
 -- | A class that provides a method that specifies how symbols should be
 --   displayed, i.e. converted to strings. Yes, it is similar to 'Show', but I
@@ -122,15 +125,27 @@ data Regex a = Empty                    -- ^ The empty regex, matches anything
              | Plus (Regex a)           -- ^ Kleene plus (1 or more)
              | Star (Regex a)           -- ^ Kleene star (0 or more)
              | Concat [Regex a]         -- ^ Concatenation of regexes
-             | Alt [Regex a]            -- ^ Disjunction of regexes
+             | Alt [Regex a] [Size]     -- ^ Disjunction of regexes
              deriving (Eq, Ord, Generic, NFData, Show)
+
+mkAlt :: [Regex a] -> Regex a
+mkAlt rs = let sizes = map size rs in Alt rs sizes
+
+size :: Regex a -> Size
+size Empty = 0
+size (Lit _) = 1
+size (QuestionMark r) = size r
+size (Star r) = size r
+size (Plus r) = size r
+size (Concat rs) = sum $ map size rs
+size (Alt _ sizes) = mean sizes
 
 -- Useful instances
 instance Functor Regex where
     fmap _ Empty = Empty
     fmap f (Lit a) = Lit $ f a
     fmap f (Concat rs) = Concat $ map (fmap f) rs
-    fmap f (Alt rs) = Alt $ map (fmap f) rs
+    fmap f (Alt rs _) = mkAlt $ map (fmap f) rs
     fmap f (Star r) = Star $ fmap f r
     fmap f (Plus r) = Plus $ fmap f r
     fmap f (QuestionMark r) = QuestionMark $ fmap f r
@@ -139,7 +154,7 @@ instance Foldable Regex where
     foldMap _ Empty = mempty
     foldMap f (Lit a) = f a
     foldMap f (Concat rs) = mconcat $ map (foldMap f) rs
-    foldMap f (Alt rs) = mconcat $ map (foldMap f) rs
+    foldMap f (Alt rs _) = mconcat $ map (foldMap f) rs
     foldMap f (Star r) = foldMap f r
     foldMap f (Plus r) = foldMap f r
     foldMap f (QuestionMark r) = foldMap f r
@@ -165,7 +180,7 @@ isRegexEmpty _ = False
 needsBracketsWithin :: Regex a -- ^ the 
                     -> Regex a
                     -> Bool
-(Alt _) `needsBracketsWithin` _ = True
+(Alt _ _) `needsBracketsWithin` _ = True
 (Concat _) `needsBracketsWithin` (Star _) = True
 (Concat _) `needsBracketsWithin` (Plus _) = True
 (Concat _) `needsBracketsWithin` (QuestionMark _) = True
@@ -200,7 +215,7 @@ showRegex r0@(Star r) = (++ "*") <$> bracketed r0 r
 showRegex r0@(Plus r) = (++ "+") <$> bracketed r0 r
 showRegex r0@(QuestionMark r) = (++ "?") <$> bracketed r0 r
 showRegex r0@(Concat rs) = concat <$> mapM (bracketed r0) rs
-showRegex r0@(Alt rs) = intercalate "|" <$> mapM (bracketed r0) rs
+showRegex r0@(Alt rs _) = intercalate "|" <$> mapM (bracketed r0) rs
 
 -- | Transform a 'Regex' into a 'String', quote using double quotes ("like
 --   this").
@@ -225,7 +240,7 @@ spliceConcat [] = []
 
 -- | Helper function to remove nested 'Alt' constructors.
 spliceAlt :: [Regex a] -> [Regex a]
-spliceAlt (Alt rs : rest) = rs ++ spliceAlt rest
+spliceAlt (Alt rs _ : rest) = rs ++ spliceAlt rest
 spliceAlt (r:rs) = r : spliceAlt rs
 spliceAlt [] = []
 
@@ -249,8 +264,8 @@ simplify' Empty = Empty
 simplify' (Lit a) = Lit a
 simplify' (Concat [r]) = simplify' r
 simplify' (Concat rs) = Concat $ map simplify' $ spliceConcat rs
-simplify' (Alt [r]) = simplify' r
-simplify' (Alt rs) = Alt $ map simplify' $ spliceAlt rs
+simplify' (Alt [r] _) = simplify' r
+simplify' (Alt rs _) = mkAlt $ map simplify' $ spliceAlt rs
 simplify' (Star (Star r)) = Star $ simplify' r
 simplify' (Star (Plus r)) = Star $ simplify' r
 simplify' (Plus (Plus r)) = Plus $ simplify' r
@@ -269,7 +284,7 @@ harvest :: Ord a => Regex a -> S.Set a
 harvest Empty = S.empty
 harvest (Lit a) = S.singleton a
 harvest (Concat rs) = foldr (\r set -> harvest r `S.union` set) S.empty rs
-harvest (Alt rs) = foldr (\r set -> harvest r `S.union` set) S.empty rs
+harvest (Alt rs _) = foldr (\r set -> harvest r `S.union` set) S.empty rs
 harvest (Star r) = harvest r
 harvest (Plus r) = harvest r
 harvest (QuestionMark r) = harvest r

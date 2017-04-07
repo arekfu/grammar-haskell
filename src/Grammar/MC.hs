@@ -15,6 +15,7 @@ module Grammar.MC
 (
 -- * The 'MC' monad
   MC
+, Sized
 , Seed
 , evalMC
 , evalMCSized
@@ -44,6 +45,9 @@ import System.Random.TF.Instances
 import Data.Int
 import Data.Foldable (Foldable, length, toList)
 
+-- local imports
+import Grammar.Size
+
 --------------------
 --  the MC monad  --
 --------------------
@@ -51,12 +55,11 @@ import Data.Foldable (Foldable, length, toList)
 -- | Just a type alias for the PRNG seed.
 type Seed = Int
 
--- | A type alias for sized random expansion
-type Size = Double
-
 -- | The 'MC' type is just an alias for a monad transformer stack. Yes, 'MC'
 --   stands for Monte Carlo.
 type MC = StateT TFGen (State Size)
+
+type Sized = State Size
 
 oneOverMaxInt64 :: Fractional a => a
 oneOverMaxInt64 = 1.0 / fromIntegral (maxBound::Int64)

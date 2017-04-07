@@ -36,7 +36,7 @@ randomExpandRegex :: Regex a -> MC [a]
 randomExpandRegex Empty = return []
 randomExpandRegex (Lit x) = return [x]
 randomExpandRegex (Concat xs) = concat <$> mapM randomExpandRegex xs
-randomExpandRegex (Alt xs) = randomExpandRegex =<< pickRandom xs
+randomExpandRegex (Alt xs _) = randomExpandRegex =<< pickRandom xs
 randomExpandRegex (Star r) = do xi <- sampleSizedExp
                                 expanded <- randomExpandRegex r
                                 scaleSizeMC scaling

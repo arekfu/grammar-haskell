@@ -53,7 +53,7 @@ alt :: Stream s m Char => ParsecT s QuotingPolicy m (Regex Char)
 alt = do r <- lexeme $ sepBy1 (lexeme concatenation) (char '|')
          case r of
              [x] -> return x
-             xs -> return $ Alt xs
+             xs -> return $ mkAlt xs
 
 concatenation :: Stream s m Char => ParsecT s QuotingPolicy m (Regex Char)
 concatenation = do r <- lexeme $ many1 (lexeme multiplication)
