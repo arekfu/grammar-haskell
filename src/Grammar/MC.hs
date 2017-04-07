@@ -24,11 +24,16 @@ module Grammar.MC
 , getSize
 , putSize
 , scaleSize
+, getSizeMC
+, putSizeMC
+, scaleSizeMC
 , uniform
 , uniformInt
 , sampleExp
 , sampleSizedExp
 , pickRandom
+-- * Reexported from 'Control.Monad.State'
+, lift
 ) where
 
 -- system imports
@@ -49,8 +54,9 @@ type Seed = Int
 -- | A type alias for sized random expansion
 type Size = Double
 
--- | The 'MC' type is just an alias for the 'State' 'StdGen' monad. Yes, 'MC' stands for Monte Carlo.
-type MC = State (TFGen, Size)
+-- | The 'MC' type is just an alias for a monad transformer stack. Yes, 'MC'
+--   stands for Monte Carlo.
+type MC = StateT TFGen (State Size)
 
 oneOverMaxInt64 :: Fractional a => a
 oneOverMaxInt64 = 1.0 / fromIntegral (maxBound::Int64)
@@ -73,38 +79,49 @@ evalMCSized :: Size -- ^ the size
             -> Seed -- ^ the starting seed
             -> a    -- ^ the computation result
 evalMCSized size obj seed = let initialGen = mkTFGen seed
-                             in evalState obj (initialGen, size)
+                             in evalState (evalStateT obj initialGen) size
 
 -----------------------------------------------
 --  some machinery to sample random numbers  --
 -----------------------------------------------
 
 -- | Extract the random-number generator.
-getGen :: (RandomGen g, MonadState (g, a) m) => m g
-getGen = fst <$> get
+getGen :: (RandomGen g, MonadState g m) => m g
+getGen = get
 
 -- | Update the random-number generator.
-putGen :: (RandomGen g, MonadState (g, a) m) => g -> m ()
-putGen gen = do (_, other) <- get
-                put (gen, other)
+putGen :: (RandomGen g, MonadState g m) => g -> m ()
+putGen = put
 
 -- | Extract the current size.
-getSize :: MonadState (a, Size) m => m Size
-getSize = snd <$> get
+getSize :: MonadState Size m => m Size
+getSize = get
 
 -- | Update the current size.
-putSize :: MonadState (a, Size) m => Size -> m ()
-putSize size = do (other, _) <- get
-                  put (other, size)
+putSize :: MonadState Size m => Size -> m ()
+putSize = put
 
 -- | Scale the current size by a given factor.
-scaleSize :: MonadState (a, Size) m => Size -> m ()
-scaleSize scaling = do (other, size) <- get
-                       put (other, size*scaling)
+scaleSize :: MonadState Size m => Size -> m ()
+scaleSize scaling = do size <- get
+                       put $ size*scaling
+
+-- | Extract the current size.
+getSizeMC :: MC Size
+getSizeMC = lift get
+
+-- | Update the current size.
+putSizeMC :: Size -> MC ()
+putSizeMC size = lift (put size)
+
+-- | Scale the current size by a given factor.
+scaleSizeMC :: Size -> MC ()
+scaleSizeMC scaling = do size <- getSizeMC
+                         putSizeMC $ size*scaling
 
 -- | Return a uniformly distributed 'Fractional' random number between 0 and 1.
 --   The interval bounds may or may not be included.
-uniform :: (RandomGen g, Fractional a, MonadState (g, b) m) => m a
+uniform :: (RandomGen g, Fractional a, MonadState g m) => m a
 uniform = do
     gen <- getGen
     let (i, gen') = randomR (1, maxBound::Int64) gen
@@ -114,7 +131,7 @@ uniform = do
 
 -- | Return a uniformly distributed integer between the specified minimum and
 --   maximum values (included).
-uniformInt :: (RandomGen g, Random a, Integral a, MonadState (g, b) m)
+uniformInt :: (RandomGen g, Random a, Integral a, MonadState g m)
            => a     -- ^ the minimum value
            -> a     -- ^ the maximum value
            -> m a   -- ^ the sampled value
@@ -128,7 +145,7 @@ uniformInt minVal maxVal = do
 -- @
 -- f(x) = exp(-&#x3BB; x)/&#x3BB;
 -- @
-sampleExp :: (RandomGen g, MonadState (g, a) m)
+sampleExp :: (RandomGen g, MonadState g m)
           => Double  -- ^ The distribution mean
           -> m Double
 sampleExp lambda = do xi <- uniform
@@ -137,15 +154,15 @@ sampleExp lambda = do xi <- uniform
 
 -- | Sample from an exponential distribution and take the current size as the
 --   distribution parameter.
-sampleSizedExp :: (RandomGen g, MonadState (g, Size) m)
-               => m Double
+sampleSizedExp :: MC Double
 sampleSizedExp = do xi <- uniform
-                    lambda <- getSize
-                    return $ (-lambda) * log xi
+                    lambda <- getSizeMC
+                    let lambda' = realToFrac lambda
+                    return $ (-lambda') * log xi
 
 
 -- | Pick a random element from a Foldable container.
-pickRandom :: (RandomGen g, MonadState (g, b) m, Foldable t) => t a -> m a
+pickRandom :: (RandomGen g, MonadState g m, Foldable t) => t a -> m a
 pickRandom set = let l = toList set
                      n = length l
                   in do ran <- uniformInt 0 (n-1)

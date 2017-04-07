@@ -39,12 +39,12 @@ randomExpandRegex (Concat xs) = concat <$> mapM randomExpandRegex xs
 randomExpandRegex (Alt xs) = randomExpandRegex =<< pickRandom xs
 randomExpandRegex (Star r) = do xi <- sampleSizedExp
                                 expanded <- randomExpandRegex r
-                                scaleSize scaling
+                                scaleSizeMC scaling
                                 let n = round xi
                                 return $ concat $ replicate n expanded
 randomExpandRegex (Plus r) = do xi <- sampleSizedExp
                                 expanded <- randomExpandRegex r
-                                scaleSize scaling
+                                scaleSizeMC scaling
                                 let n = 1 + round xi
                                 return $ concat $ replicate n expanded
 randomExpandRegex (QuestionMark r) = do xi <- uniform :: MC Double
